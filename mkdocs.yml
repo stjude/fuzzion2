@@ -1,0 +1,11 @@
+site_name: "[PROJECT NAME] - St. Jude"
+repo_url: "https://github.com/stjude[cloud]/REPO_NAME"
+
+site_description: "[HIGH LEVEL DISCRIPTION.]"
+site_author: "St. Jude Cloud"
+copyright: "© 2021 St. Jude Children's Research Hospital"
+
+nav:
+  - "Home": "index.md"
+
+theme: cosmo
