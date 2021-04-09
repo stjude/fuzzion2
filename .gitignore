@@ -1,0 +1,2 @@
+# ignore k-mer rank tables, if any
+*.krt
