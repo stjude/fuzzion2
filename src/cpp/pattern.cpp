@@ -73,6 +73,12 @@ static WindowVector *getWindows(const std::string& sequence, MinimizerWindowLeng
 Pattern::Pattern(const std::string& inName, const std::string& inSequence)
    : name(inName), displaySequence(inSequence)
 {
+   if (name.length() == 0)
+      throw std::runtime_error("zero-length pattern name");
+
+   if (name.find(' ') != std::string::npos)
+      throw std::runtime_error("space not allowed in pattern name \"" + name + "\"");
+
    bool foundDelimiters = false;
    int  delim1, delim2;
 
