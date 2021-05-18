@@ -5,9 +5,6 @@ FROM debian:10 AS builder
 ENV CPATH=/opt/htslib/include:$CPATH \
     LIBRARY_PATH=/opt/htslib/lib:$LIBRARY_PATH
 
-# fuzzion2: g++ make
-# htslib: gcc lbzip2 libdeflate-dev make wget zlib1g-dev
-# wget: ca-certificates
 RUN apt-get update \
         && apt-get --yes install --no-install-recommends \
             ca-certificates \
@@ -40,13 +37,40 @@ COPY src/ src/
 
 RUN make --jobs $(ncpus)
 
-FROM debian:10
 
-ENV PATH=/opt/fuzzion2/bin:$PATH \
-    LD_LIBRARY_PATH=/opt/fuzzion2/lib:/opt/htslib/lib:$LD_LIBRARY_PATH
+FROM scratch as intermediate
+WORKDIR /data
 
-COPY --from=builder /opt/htslib/lib/ /opt/htslib/lib/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libdeflate.so.0 /opt/fuzzion2/lib/
-COPY --from=builder /tmp/fuzzion2/build/bin/ /opt/fuzzion2/bin/
+COPY --from=builder /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc.so.6
+COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/libgcc_s.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/x86_64-linux-gnu/libm.so.6
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+COPY --from=builder /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 
-CMD ["fuzzion2"]
+# ------ FUZZION2 -----
+FROM intermediate as fuzzion2
+
+COPY --from=builder /opt/htslib/lib/libhts.so.3 /lib/libhts.so.3
+COPY --from=builder /lib/x86_64-linux-gnu/libpthread.so.0 /lib/x86_64-linux-gnu/libpthread.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libdeflate.so.0 /usr/lib/x86_64-linux-gnu/libdeflate.so.0
+COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
+
+COPY --from=builder /tmp/fuzzion2/build/bin/fuzzion2 /fuzzion2
+
+ENTRYPOINT ["/fuzzion2"]
+CMD ["-h"]
+
+# ----- FUZZORT -----
+FROM intermediate as fuzzort
+
+COPY --from=builder /tmp/fuzzion2/build/bin/fuzzort /fuzzort
+
+ENTRYPOINT ["/fuzzort"]
+
+# ----- KMERANK -----
+FROM intermediate as kmerank
+
+COPY --from=builder /tmp/fuzzion2/build/bin/kmerank /kmerank
+
+ENTRYPOINT ["/kmerank"]
+CMD ["-h"]
