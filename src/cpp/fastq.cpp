@@ -98,7 +98,7 @@ void FastqReader::close()
 }
 
 //------------------------------------------------------------------------------------
-// FastqPairReader::getNextPair() gets the next read-pair and returns true, or returns
+// FastqPairReader::getNextPair() gets the next read pair and returns true, or returns
 // false when end-of-file is reached
 
 bool FastqPairReader::getNextPair(std::string& name1, std::string& sequence1,
@@ -120,7 +120,7 @@ bool FastqPairReader::getNextPair(std::string& name1, std::string& sequence1,
 }
 
 //------------------------------------------------------------------------------------
-// InterleavedFastqPairReader::getNextPair() gets the next read-pair and returns true,
+// InterleavedFastqPairReader::getNextPair() gets the next read pair and returns true,
 // or returns false when end-of-file is reached
 
 bool InterleavedFastqPairReader::getNextPair(

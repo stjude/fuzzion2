@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------------
 //
 // fuzzion2.cpp - this program is a "fuzzy fusion finder"; it does fuzzy matching of
-//                read-pairs to fusion patterns
+//                read pairs to fusion patterns
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -10,24 +10,26 @@
 //------------------------------------------------------------------------------------
 
 #include "fastq.h"
-#include "pattern.h"
+#include "match.h"
 #include "ubam.h"
-#include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
 
-const std::string VERSION_ID     = "fuzzion2 v1.0.0, copyright 2021 "
-                                   "St. Jude Children's Research Hospital";
+const std::string VERSION_NAME   = "fuzzion2 v1.0.1";
+const std::string COPYRIGHT      =
+   "copyright 2021 St. Jude Children's Research Hospital";
 
-const int    THREAD_BATCH_SIZE   = 100000; // number of read-pairs in a full batch
+const int    THREAD_BATCH_SIZE   = 100000; // number of read pairs in a full batch
 
 const double DEFAULT_MAX_RANK    = 95;  // default max rank percentile of minimizers
 const double DEFAULT_MIN_BASES   = 90;  // default min percentile of matching bases
 const int    DEFAULT_MAX_INSERT  = 500; // default max insert size in bases
 const int    DEFAULT_MIN_MINS    = 3;   // default min number of matching minimizers
 const int    DEFAULT_MIN_OVERLAP = 5;   // default min length of overlap in #bases
+const int    DEFAULT_SHOW        = 1;   // default setting of -show option
 const int    DEFAULT_THREADS     = 8;   // default number of threads
 const int    DEFAULT_WINDOW_LEN  = 5;   // default length of windows in #bases
 
@@ -36,6 +38,7 @@ double minBases   = DEFAULT_MIN_BASES;
 int    maxInsert  = DEFAULT_MAX_INSERT;
 int    minMins    = DEFAULT_MIN_MINS;
 int    minOverlap = DEFAULT_MIN_OVERLAP;
+int    show       = DEFAULT_SHOW;
 int    numThreads = DEFAULT_THREADS;
 int    w          = DEFAULT_WINDOW_LEN;
 
@@ -52,13 +55,13 @@ Minimizer      maxMinimizer;         // limit used to identify common minimizers
 PatternVector *patternVector;        // holds the input patterns
 PatternMap    *patternMap;           // index of pattern minimizers
 
-PairReader    *pairReader;           // used to get read-pairs
-bool           endOfInput = false;   // set to true when done getting read-pairs
+PairReader    *pairReader;           // used to get read pairs
+bool           endOfInput = false;   // set to true when done getting read pairs
 
-std::mutex     inputMutex;           // for getting read-pairs
+std::mutex     inputMutex;           // for getting read pairs
 std::mutex     outputMutex;          // for writing hits to std::cout
 
-uint64_t       numReadPairs = 0;     // number of read-pairs found in the input
+uint64_t       numReadPairs = 0;     // number of read pairs found in the input
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stdout
@@ -66,7 +69,7 @@ uint64_t       numReadPairs = 0;     // number of read-pairs found in the input
 void showUsage(const char *progname)
 {
    std::cout
-      << VERSION_ID << NEWLINE << NEWLINE
+      << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
       << "Usage: " << progname << " OPTION ... [ubam_filename ...] > matches"
       << NEWLINE;
 
@@ -103,6 +106,9 @@ void showUsage(const char *progname)
       << "  -minov=N           "
              << "minimum overlap in number of bases, default is "
              << DEFAULT_MIN_OVERLAP << NEWLINE
+      << "  -show=N            "
+             << "show best only (1) or all patterns (0) matching a read pair, "
+             << "default is " << DEFAULT_SHOW << NEWLINE
       << "  -threads=N         "
              << "number of threads, default is "
 	     << DEFAULT_THREADS << NEWLINE
@@ -139,6 +145,7 @@ bool parseArgs(int argc, char *argv[])
 	  intOpt   (opt, "maxins",   maxInsert)       ||
 	  intOpt   (opt, "minmins",  minMins)         ||
           intOpt   (opt, "minov",    minOverlap)      ||
+          intOpt   (opt, "show",     show)            ||
 	  intOpt   (opt, "threads",  numThreads)      ||
           intOpt   (opt, "w",        w)               ||
           stringOpt(opt, "pattern",  patternFilename) ||
@@ -166,232 +173,125 @@ bool parseArgs(int argc, char *argv[])
          return false; // invalid specification of file names
 
    return (maxRank > 0.0 && maxRank <= 100.0 && minBases > 0.0 && minBases <= 100.0 &&
-	   maxInsert >= 100 && minMins > 0 && minOverlap > 0 && 
-	   numThreads > 0 && numThreads <= 64 && w > 0 && w < 256 &&
-	   patternFilename != "" && rankFilename != "");
+	   maxInsert >= 100 && minMins > 0 && minOverlap > 0 &&
+	   (show == 0 || show == 1) && numThreads > 0 && numThreads <= 64 &&
+	   w > 0 && w < 256 && patternFilename != "" && rankFilename != "");
 }
 
 //------------------------------------------------------------------------------------
-// computeMinMatches() returns the minimum number of matching bases for the given
-// sequence length
+// writePattern() writes a pattern to stdout
 
-int computeMinMatches(int seqlen)
+void writePattern(const Pattern& pattern, std::string sequence, int matchingBases,
+                  int possible, int insertSize)
 {
-   return std::ceil((minBases / 100) * seqlen);
+   std::cout << "pattern " << pattern.name
+             << TAB << sequence
+	     << TAB << matchingBases
+	     << TAB << possible
+	     << TAB << std::fixed << std::setprecision(1)
+                    << 100.0 * matchingBases / possible
+             << TAB << insertSize;
+
+   int numAnnotations = pattern.annotation.size();
+
+   for (int i = 0; i < numAnnotations; i++)
+      std::cout << TAB << pattern.annotation[i];
+
+   std::cout << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
-// hasCandidates() returns true if each of the given sequences has at least one
-// candidate match in the pattern set; if true is returned, the candidate matches are
-// provided in the vectors and it is the caller's obligation to de-allocate these
-// vectors; if false is returned, the caller must not access or de-allocate the
-// vectors
+// writeRead() writes a read to stdout
 
-bool hasCandidates(const std::string& sequence1,  const std::string& sequence2,
-                   CandidateVector *& candidate1, CandidateVector *& candidate2)
+void writeRead(const std::string& name, int leadingBlanks,
+               const std::string& sequence, int matchingBases, int possible)
 {
-   candidate1 = findCandidates(sequence1, patternMap, patternVector,
-		               w, rankTable, maxMinimizer, minMins,
-			       computeMinMatches(sequence1.length()));
-
-   int numCandidates1 = candidate1->size();
-   if (numCandidates1 == 0)
-   {
-      delete candidate1;
-      return false;
-   }
-
-   std::string revcomp = stringReverseComplement(sequence2);
-
-   PatternVector eligiblePattern(patternVector->size(), NULL);
-
-   for (int i = 0; i < numCandidates1; i++)
-   {
-      int index = (*candidate1)[i].location.index;
-      eligiblePattern[index] = (*patternVector)[index];
-   }
-
-   candidate2 = findCandidates(revcomp, patternMap, &eligiblePattern,
-		               w, rankTable, maxMinimizer, minMins,
-			       computeMinMatches(sequence2.length()));
-
-   if (candidate2->size() > 0)
-      return true;
-
-   delete candidate1;
-   delete candidate2;
-   return false;
+   std::cout << "read " << name
+             << TAB << std::string(leadingBlanks, ' ') << sequence
+	     << TAB << matchingBases
+	     << TAB << possible
+	     << TAB << std::fixed << std::setprecision(1)
+                    << 100.0 * matchingBases / possible
+             << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
-// bestMatch() returns the best matching pattern for the given sequences or NULL if
-// none; the match offsets within the pattern sequence are provided
+// writeMatch() writes a match to stdout
 
-const Pattern *bestMatch(const std::string& sequence1, const std::string& sequence2,
-                         int& bestOffset1, int& bestOffset2)
+void writeMatch(const std::string& name1, const std::string& sequence1,
+                const std::string& name2, const std::string& sequence2,
+		const Match& match)
 {
-   CandidateVector *candidate1, *candidate2;
+   const Pattern& pattern = (*patternVector)[match.c1.index];
 
-   if (!hasCandidates(sequence1, sequence2, candidate1, candidate2))
-      return NULL; // no match
+   int offset1    = match.c1.offset;
+   int offset2    = match.c2.offset;
+   int offsetDiff = match.offsetDiff();
 
-   int numCandidates1 = candidate1->size();
-   int numCandidates2 = candidate2->size();
+   int plen = pattern.sequence.length();
 
-   int bestIndex = -1, maxMatches;
+   int len1 = std::min((int)sequence1.length(), plen - offset1);
+   int len2 = std::min((int)sequence2.length(), plen - offset2);
 
-   for (int i = 0; i < numCandidates1; i++)
-   {
-      const Location& loc1 = (*candidate1)[i].location;
+   int displayLen = std::max(len1, len2 + offsetDiff) + 2;
 
-      for (int j = 0; j < numCandidates2; j++)
-      {
-         const Location& loc2 = (*candidate2)[j].location;
+   int insertSize = offsetDiff + sequence2.length();
 
-	 if (loc1.index != loc2.index)
-            continue; // different pattern
+   int leadingBlanks = offsetDiff + (offset2 >= plen - pattern.rightBases ? 2 :
+                                    (offset2 >= pattern.leftBases ? 1 : 0));
 
-	 if (loc1.offset > loc2.offset)
-            continue; // incompatible offsets
+   writePattern(pattern, pattern.displaySequence.substr(offset1, displayLen),
+                match.matchingBases(), sequence1.length() + sequence2.length(),
+		insertSize);
 
-	 if (loc2.offset - loc1.offset + sequence2.length() > maxInsert)
-            continue; // alignment is longer than the maximum insert size
+   writeRead(name1, 0, sequence1, match.c1.matchingBases, sequence1.length());
 
-	 int matches = (*candidate1)[i].matches + (*candidate2)[j].matches;
-
-	 if (bestIndex >= 0 && (matches < maxMatches || matches == maxMatches &&
-             loc2.offset - loc1.offset >= bestOffset2 - bestOffset1))
-            continue; // not the best match
-
-	 // save the best match
-	 bestIndex   = loc1.index;
-	 bestOffset1 = loc1.offset;
-	 bestOffset2 = loc2.offset;
-	 maxMatches  = matches;
-      }
-   }
-
-   delete candidate1;
-   delete candidate2;
-
-   return (bestIndex >= 0 ? (*patternVector)[bestIndex] : NULL);
+   writeRead(name2, leadingBlanks, sequence2, match.c2.matchingBases,
+             sequence2.length());
 }
 
 //------------------------------------------------------------------------------------
-// overlapLeft() returns true if the given sequence aligned at the specified offset
-// overlaps the left side of the pattern
-
-bool overlapLeft(const std::string& sequence, const Pattern *pattern, int offset)
-{
-   int maxPatternLen = pattern->sequence.length() - offset;
-   int patternLen    = std::min((int)sequence.length(), maxPatternLen);
-   int overlapBases  = std::min(patternLen, pattern->leftBases - offset);
-
-   if (overlapBases < minOverlap)
-      return false; // insufficient number of overlapping bases
-
-   if (overlapBases == patternLen)
-      return true;  // full overlap; we have already verified agreement of bases
-
-   // verify agreement of bases for partial overlap
-   int lcslen = lengthOfLCS(sequence, 0, overlapBases, pattern->sequence, offset,
-                            overlapBases);
-
-   return (lcslen >= computeMinMatches(overlapBases));
-}
-
-//------------------------------------------------------------------------------------
-// overlapRight() returns true if the given sequence aligned at the specified offset
-// overlaps the right side of the pattern
-
-bool overlapRight(const std::string& sequence, const Pattern *pattern, int offset)
-{
-   int maxPatternLen = pattern->sequence.length() - offset;
-   int patternLen    = std::min((int)sequence.length(), maxPatternLen);
-   int overlapBases  = patternLen + std::min(0, pattern->rightBases - maxPatternLen);
-
-   if (overlapBases < minOverlap)
-      return false; // insufficient number of overlapping bases
-
-   if (overlapBases == patternLen)
-      return true;  // full overlap; we have already verified agreement of bases
-
-   // verify agreement of bases for partial overlap
-   int lcslen = lengthOfLCS(sequence, sequence.length() - overlapBases, overlapBases,
-                            pattern->sequence, offset + patternLen - overlapBases,
-			    overlapBases);
-
-   return (lcslen >= computeMinMatches(overlapBases));
-}
-
-//------------------------------------------------------------------------------------
-// processOrientation() matches the given paired reads to the set of patterns
+// processOrientation() matches the given read pair to the set of patterns
 
 void processOrientation(const std::string& name1, const std::string& sequence1,
                         const std::string& name2, const std::string& sequence2)
 {
-   int offset1, offset2;
+   MatchVector matchVector;
 
-   const Pattern *pattern = bestMatch(sequence1, sequence2, offset1, offset2);
-   if (!pattern)
-      return;
+   getMatches(sequence1, sequence2, patternVector, patternMap, w, rankTable,
+              maxMinimizer, minBases, minMins, maxInsert, (show == 1), matchVector);
+
+   int numMatches = matchVector.size();
+   if (numMatches == 0)
+      return; // no matches
 
    std::string revcomp = stringReverseComplement(sequence2);
 
-   bool foundHit = false;
+   // determine the number of matches with valid overlaps
+   int numValid = 0;
 
-   if (pattern->hasBraces)
-   {
-      if (overlapLeft (sequence1, pattern, offset1) &&
-          overlapRight(sequence1, pattern, offset1) ||
-	  overlapLeft (revcomp,   pattern, offset2) &&
-	  overlapRight(revcomp,   pattern, offset2))
-         foundHit = true;
-   }
-   else // brackets
-      if (overlapLeft (sequence1, pattern, offset1) &&
-          overlapRight(revcomp,   pattern, offset2))
-         foundHit = true;
+   while (numValid < numMatches &&
+          validOverlaps(sequence1, revcomp, patternVector, minBases, minOverlap,
+                        matchVector[numValid]))
+      numValid++;
 
-   if (!foundHit)
-      return;
+   if (numValid == 0)
+      return; // no valid matches
 
-   int insertSize = offset2 - offset1 + sequence2.length();
+   // write valid matches
 
-   int len     = pattern->sequence.length();
-   int len1    = std::min((int)sequence1.length(), len - offset1);
-   int len2    = std::min((int)sequence2.length(), len - offset2);
-   int dispLen = std::max(len1, len2 + offset2 - offset1) + 2;
-
-   int leadingBlanks = offset2 - offset1;
-
-   if (offset2 >= pattern->sequence.length() - pattern->rightBases)
-      leadingBlanks += 2; // account for two delimiter characters
-   else if (offset2 >= pattern->leftBases)
-      leadingBlanks++;    // account for one delimiter character
-
-   // write the match
    if (numThreads > 1)
       outputMutex.lock();
 
-   std::cout << "pattern " << pattern->name << " " << insertSize
-             << TAB << pattern->displaySequence.substr(offset1, dispLen)
-	     << NEWLINE;
-
-   std::cout << name1
-             << TAB << sequence1
-	     << NEWLINE;
-
-   std::cout << name2
-             << TAB << std::string(leadingBlanks, ' ') << revcomp
-	     << NEWLINE;
+   for (int i = 0; i < numValid; i++)
+      writeMatch(name1, sequence1, name2, revcomp, matchVector[i]);
 
    if (numThreads > 1)
       outputMutex.unlock();
 }
 
 //------------------------------------------------------------------------------------
-// getBatch() gets the next batch of read-pairs and returns the number of read-pairs
+// getBatch() gets the next batch of read pairs and returns the number of read pairs
 // obtained; if less than a full batch, end-of-input was reached; if an exception was
 // raised, its message is provided
 
@@ -433,7 +333,7 @@ int getBatch(StringVector& name1, StringVector& seq1,
 }
 
 //------------------------------------------------------------------------------------
-// processBatch() processes the given batch of read-pairs; if an exception is raised,
+// processBatch() processes the given batch of read pairs; if an exception is raised,
 // its message is provided
 
 void processBatch(int count,
@@ -464,7 +364,7 @@ void processBatch(int count,
 }
 
 //------------------------------------------------------------------------------------
-// threadWork() contains the work that each thread performs, processing read-pairs
+// threadWork() contains the work that each thread performs, processing read pairs
 // until end-of-input is detected; if an exception occurs, its message is provided
 
 void threadWork(std::string *message)
@@ -503,10 +403,27 @@ int main(int argc, char *argv[])
 
       maxMinimizer = (maxRank / 100) * numKmers(rankTable->k);
 
-      patternVector = readPatterns(patternFilename);
+      StringVector annotationHeading;
+
+      patternVector = readPatterns(patternFilename, annotationHeading);
 
       if (patternVector->size() == 0)
          throw std::runtime_error("no patterns in " + patternFilename);
+
+      // write output heading line
+      std::cout << VERSION_NAME
+                << TAB << "sequence"
+		<< TAB << "matching bases"
+		<< TAB << "possible"
+		<< TAB << "% match"
+		<< TAB << "insert size";
+
+      int numAnnotations = annotationHeading.size();
+
+      for (int i = 0; i < numAnnotations; i++)
+         std::cout << TAB << annotationHeading[i];
+
+      std::cout << NEWLINE;
 
       patternMap = createPatternMap(patternVector, w, rankTable, maxMinimizer);
 
@@ -561,9 +478,7 @@ int main(int argc, char *argv[])
 
       delete pairReader;
 
-      std::cout << numReadPairs
-                << TAB << "read pairs"
-		<< NEWLINE;
+      std::cout << "read-pairs " << numReadPairs << NEWLINE;
    }
    catch (const std::runtime_error& error)
    {

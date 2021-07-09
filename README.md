@@ -1,7 +1,7 @@
 # fuzzion2
 
-fuzzion2 searches RNA and DNA to find read-pairs that match fusion patterns.
-
+fuzzion2 searches RNA and DNA to find read pairs that match fusion patterns.
+  
 ## Quick Start
 
 ### Docker
@@ -45,7 +45,7 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HTSLIB/lib
 Running fuzzion2 with no command-line arguments displays its usage.
 
 ```
-fuzzion2 OPTION ... [ubam_filename ...] > matches
+Usage: fuzzion2 OPTION ... [ubam_filename ...] > matches
 
 These options are required:
   -pattern=filename  name of pattern input file
@@ -60,6 +60,7 @@ The following are optional:
   -minbases=N        minimum percentile of matching bases, default is 90.0
   -minmins=N         minimum number of matching minimizers, default is 3
   -minov=N           minimum overlap in number of bases, default is 5
+  -show=N            show best only (1) or all patterns (0) matching a read pair, default is 1
   -threads=N         number of threads, default is 8
   -w=N               window length in number of bases, default is 5
 ```
@@ -82,14 +83,14 @@ The kmerank program is provided to construct rank tables for other species.
 *Since fuzzion2 reads the 4-GB rank table into memory, be sure to run fuzzion2 with
 at least 5 GB of memory.*
 
-fuzzion2 examines each read-pair to see if it matches any of the patterns in the
-pattern file.  Read-pairs are obtained from:
+fuzzion2 examines each read pair to see if it matches any of the patterns in the
+pattern file.  Read pairs are obtained from:
 
 1. a single interleaved FASTQ file named by the `-ifastq` option;
 1. a pair of FASTQ files identified by the `-fastq1` and `-fastq2` options; or
 1. one or more unaligned Bam files specified on the command line.
 
-fuzzion2 expects that the mates of a read-pair are adjacent in interleaved FASTQ
+fuzzion2 expects that the mates of a read pair are adjacent in interleaved FASTQ
 files and unaligned Bam files.  If a pair of FASTQ files is specified, the mates
 are separated; "Read 1" mates are in the first file and corresponding "Read 2"
 mates are in the second file.  If the name of a FASTQ file ends with ".gz",
@@ -97,21 +98,20 @@ fuzzion2 assumes that the file is gzipped and uses gunzip to decompress the data
 
 ### Output
 
-Each read-pair that matches a pattern is a "hit" and is written along with the
+Each read pair that matches a pattern is a "hit" and is written along with the
 pattern on three lines to the standard output stream.  In the following example,
-`BCR-ABL1` is the name of the pattern and 208 is the insert size of the read-pair
-aligned to the pattern.  The second column of the first line shows the substring
-of the pattern sequence that matches the read-pair.  The second and third lines
-show the read name and entire sequence of each mate.
+`BCR-ABL1` is the name of the pattern.  The second column of the first line shows
+the substring of the pattern sequence that matches the read pair.  The second and
+third lines show the read name and entire sequence of each mate.
 
 ```
-pattern BCR-ABL1 208         CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAA]GGAAGA[AGCCCTTCAGCGGCCAGTAGCATCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
-EXAMPLE:1105:12909:66982/2   CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAAGGAAGAAGCCCTTCAGCGGCCA
-EXAMPLE:1105:12909:66982/1                                                                                                                TCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
+pattern BCR-ABL1                 CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAA]GGAAGA[AGCCCTTCAGCGGCCAGTAGCATCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
+read EXAMPLE:1105:12909:66982/2  CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAAGGAAGAAGCCCTTCAGCGGCCA
+read EXAMPLE:1105:12909:66982/1                                                                                                               TCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
 ```
 
 A final line is written to the standard output stream showing the total number
-of read-pairs processed by the program.
+of read pairs processed by the program.
 
 When multithreading is used (i.e., the value of the `-threads` option is greater
 than 1), the order of the hits is indeterminate and a simple `diff` cannot be
@@ -134,7 +134,7 @@ fuzzion2 -pattern=example_patterns.txt -rank=fuzzion2_hg38_k15.krt \
 The file named `my_output.txt` should match the provided file named
 `example_output.txt`.
 
-If the read-pairs for a sample are stored in multiple pairs of FASTQ files, run
+If the read pairs for a sample are stored in multiple pairs of FASTQ files, run
 fuzzion2 once for each pair of FASTQ files and concatenate the resulting output
 files.  Then run fuzzort on the concatenated file to get a single sorted file
 of hits.

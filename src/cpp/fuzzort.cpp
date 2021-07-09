@@ -15,11 +15,13 @@
 #include <sstream>
 #include <stdexcept>
 
-const std::string VERSION_ID  = "fuzzort v1.0.0, copyright 2021 "
-                                "St. Jude Children's Research Hospital";
+const std::string VERSION_ID = "fuzzort v1.0.1, copyright 2021 "
+                               "St. Jude Children's Research Hospital";
 
-const std::string PATTERN     = "pattern";
-const std::string READ_PAIRS  = "read pairs";
+const std::string FUZZION2   = "fuzzion2 ";
+const std::string PATTERN    = "pattern ";
+const std::string READ       = "read ";
+const std::string READ_PAIRS = "read-pairs ";
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stdout
@@ -36,13 +38,13 @@ void showUsage(const char *progname)
 class Hit
 {
 public:
-   Hit(const std::string& inPatternName, const std::string& inRead1Name,
-       const std::string& inLines)
-      : patternName(inPatternName), read1Name(inRead1Name), lines(inLines) { }
+   Hit(const std::string& inPatternLine, const std::string& inRead1Line,
+       const std::string& inRead2Line)
+      : patternLine(inPatternLine), read1Line(inRead1Line), read2Line(inRead2Line) { }
 
    virtual ~Hit() { }
 
-   std::string patternName, read1Name, lines;
+   std::string patternLine, read1Line, read2Line;
 };
 
 typedef std::vector<Hit *> HitVector;
@@ -51,10 +53,10 @@ struct HitCompare
 {
    bool operator()(Hit* const& a, Hit* const& b) const
    {
-      // order by ascending patternName, then by ascending read1Name
-      return (a->patternName == b->patternName ?
-              (a->read1Name   < b->read1Name) :
-	      (a->patternName < b->patternName));
+      // order by ascending patternLine, then by ascending read1Line
+      return (a->patternLine == b->patternLine ?
+              (a->read1Line   < b->read1Line) :
+	      (a->patternLine < b->patternLine));
    }
 };
 
@@ -64,44 +66,59 @@ void sortHits(HitVector& hitVector)
 }
 
 //------------------------------------------------------------------------------------
-// readHits() reads the hits from stdin and stores them in the vector; the number of
-// read pairs is summed and returned to the caller
+// hasPrefix() returns true if the given string has the given prefix
 
-uint64_t readHits(HitVector& hitVector)
+bool hasPrefix(const std::string& s, const std::string& prefix)
 {
-   const std::string EOL(1, NEWLINE); // string containing a newline character
+   int prefixLen = prefix.length();
+
+   if (s.length() < prefixLen)
+      return false;
+
+   return (s.substr(0, prefixLen) == prefix);
+}
+
+//------------------------------------------------------------------------------------
+// readHits() reads the hits from stdin and stores them in the vector; the number of
+// read pairs is summed and returned to the caller; the heading line is also provided
+
+uint64_t readHits(HitVector& hitVector, std::string& headingLine)
+{
+   if (!std::getline(std::cin, headingLine))
+      throw std::runtime_error("no input");
+
+   if (!hasPrefix(headingLine, FUZZION2))
+      throw std::runtime_error("missing or invalid heading line");
 
    uint64_t numReadPairs = 0;
-
    std::string line1, line2, line3;
 
    while (std::getline(std::cin, line1))
-   {
-      StringVector line1_col, line1a_col, line2_col, line3_col;
-
-      if (splitString(line1, line1_col) != 2)
-         throw std::runtime_error("invalid input");
-
-      if (line1_col[1] == READ_PAIRS)
+      if (hasPrefix(line1, FUZZION2)) // found another heading line
+         if (line1 == headingLine)
+            continue; // ignore it
+         else
+            throw std::runtime_error("inconsistent heading lines");
+      else if (hasPrefix(line1, PATTERN)) // found a hit
+         if (std::getline(std::cin, line2) && hasPrefix(line2, READ) &&
+             std::getline(std::cin, line3) && hasPrefix(line3, READ))
+            hitVector.push_back(new Hit(line1, line2, line3));
+         else
+            throw std::runtime_error("invalid input after " + line1);
+      else if (hasPrefix(line1, READ_PAIRS)) // found number of read pairs
       {
-	 std::istringstream stream(line1_col[0]);
-	 uint64_t  count;
-	 stream >> count;
-	 numReadPairs += count;
-	 continue;
+         StringVector part;
+
+	 if (splitString(line1, part, ' ') == 2)
+	 {
+            std::istringstream stream(part[1]);
+	    uint64_t count = 0;
+	    stream >> count;
+	    numReadPairs += count;
+	 }
       }
-
-      // verify that we have encountered a valid hit
-      if (splitString(line1_col[0], line1a_col, ' ') != 3 ||
-          line1a_col[0] != PATTERN ||
-	  !std::getline(std::cin, line2) || splitString(line2, line2_col) != 2 ||
-	  !std::getline(std::cin, line3) || splitString(line3, line3_col) != 2)
-         throw std::runtime_error("invalid input");
-
-      std::string lines = line1 + EOL + line2 + EOL + line3 + EOL;
-
-      hitVector.push_back(new Hit(line1a_col[1], line2_col[0], lines));
-   }
+      else
+         throw std::runtime_error("invalid input " + line1);
 
    return numReadPairs;
 }
@@ -110,14 +127,19 @@ uint64_t readHits(HitVector& hitVector)
 // writeHits() writes the hits in the vector to stdout, followed by the number of
 // read pairs
 
-void writeHits(const HitVector& hitVector, uint64_t numReadPairs)
+void writeHits(const HitVector& hitVector, const std::string& headingLine,
+               uint64_t numReadPairs)
 {
+   std::cout << headingLine << NEWLINE;
+
    int numHits = hitVector.size();
 
    for (int i = 0; i < numHits; i++)
-      std::cout << hitVector[i]->lines;
+      std::cout << hitVector[i]->patternLine << NEWLINE
+                << hitVector[i]->read1Line   << NEWLINE
+		<< hitVector[i]->read2Line   << NEWLINE;
 
-   std::cout << numReadPairs << TAB << READ_PAIRS << NEWLINE;
+   std::cout << READ_PAIRS << numReadPairs << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -132,13 +154,14 @@ int main(int argc, char *argv[])
 
    try
    {
-      HitVector hitVector;
+      HitVector   hitVector;
+      std::string headingLine;
 
-      uint64_t numReadPairs = readHits(hitVector);
+      uint64_t numReadPairs = readHits(hitVector, headingLine);
 
       sortHits(hitVector);
 
-      writeHits(hitVector, numReadPairs);
+      writeHits(hitVector, headingLine, numReadPairs);
    }
    catch (const std::runtime_error& error)
    {

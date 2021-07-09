@@ -28,7 +28,7 @@ void UbamPairReader::open(const StringVector& inFilename)
 }
 
 //------------------------------------------------------------------------------------
-// UbamPairReader::getNextPair() gets the next read-pair and returns true, or returns
+// UbamPairReader::getNextPair() gets the next read pair and returns true, or returns
 // false when end-of-file on the last file is reached
 
 bool UbamPairReader::getNextPair(std::string& name1, std::string& sequence1,

@@ -12,15 +12,16 @@
 #define PATTERN_H
 
 #include "minimizer.h"
+#include "util.h"
 #include <unordered_map>
-#include <vector>
 
 //------------------------------------------------------------------------------------
 
 class Pattern
 {
 public:
-   Pattern(const std::string& inName, const std::string& inSequence);
+   Pattern(const std::string& inName, const std::string& inSequence,
+           const StringVector& inAnnotation);
 
    virtual ~Pattern() { }
 
@@ -30,9 +31,10 @@ public:
    int  leftBases;              // #bases in left  side of sequence
    int  rightBases;             // #bases in right side of sequence
    bool hasBraces;              // true = braces, false = brackets
+   StringVector annotation;     // zero or more annotations
 };
 
-typedef std::vector<Pattern *> PatternVector;
+typedef std::vector<Pattern> PatternVector;
 
 //------------------------------------------------------------------------------------
 
@@ -55,39 +57,12 @@ typedef std::unordered_map<Minimizer, LocationVector> PatternMap;
 
 //------------------------------------------------------------------------------------
 
-class Candidate // candidate for best alignment of a read to a pattern
-{
-public:
-   Candidate(const Location& inLocation, int inMatches)
-      : location(inLocation), matches(inMatches) { }
-
-   virtual ~Candidate() { }
-
-   Location location; // location within a pattern sequence
-   int matches;       // number of bases matching the read
-};
-
-typedef std::vector<Candidate> CandidateVector;
-
-//------------------------------------------------------------------------------------
-
-PatternVector *readPatterns(const std::string& filename);
+PatternVector *readPatterns(const std::string& filename,
+                            StringVector& annotationHeading);
 
 PatternMap *createPatternMap(const PatternVector *patternVector,
-                             MinimizerWindowLength w,
-			     const KmerRankTable *rankTable,
+                             MinimizerWindowLength w, const KmerRankTable *rankTable,
 			     Minimizer maxMinimizer);
-
-int lengthOfLCS(const std::string& strA, int offsetA, int lenA,
-		const std::string& strB, int offsetB, int lenB);
-
-CandidateVector *findCandidates(const std::string& sequence,
-	 	                PatternMap *patternMap,
-                                const PatternVector *patternVector,
-			        MinimizerWindowLength w,
-			        const KmerRankTable *rankTable,
-			        Minimizer maxMinimizer,
-			        int minMinimizers, int minMatches);
 
 //------------------------------------------------------------------------------------
 #endif
