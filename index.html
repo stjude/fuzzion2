@@ -12,18 +12,18 @@
         <link href="css/bootstrap.min.css" rel="stylesheet">
         <link href="css/font-awesome.min.css" rel="stylesheet">
         <link href="css/base.css" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/purebasic.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/purebasic.min.css">
 
         <script src="js/jquery-1.10.2.min.js" defer></script>
         <script src="js/bootstrap.min.js" defer></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/highlight.min.js"></script>
         <script>hljs.initHighlightingOnLoad();</script> 
     </head>
 
     <body class="homepage">
         <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
             <div class="container">
-                <a class="navbar-brand" href=".">[PROJECT NAME] - St. Jude</a>
+                <a class="navbar-brand" href="index.html">[PROJECT NAME] - St. Jude</a>
                 <!-- Expander button -->
                 <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#navbar-collapse">
                     <span class="navbar-toggler-icon"></span>
@@ -89,7 +89,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="fuzzion2">fuzzion2</h1>
-<p>fuzzion2 searches RNA and DNA to find read-pairs that match fusion patterns.</p>
+<p>fuzzion2 searches RNA and DNA to find read pairs that match fusion patterns.</p>
 <h2 id="quick-start">Quick Start</h2>
 <h3 id="docker">Docker</h3>
 <p>Coming soon.</p>
@@ -113,7 +113,7 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HTSLIB/lib
 <p><a href="https://www.gnu.org/software/gzip/">gunzip</a> is used to decompress gzipped FASTQ data.</p>
 <h2 id="usage">Usage</h2>
 <p>Running fuzzion2 with no command-line arguments displays its usage.</p>
-<pre><code>fuzzion2 OPTION ... [ubam_filename ...] &gt; matches
+<pre><code>Usage: fuzzion2 OPTION ... [ubam_filename ...] &gt; matches
 
 These options are required:
   -pattern=filename  name of pattern input file
@@ -128,6 +128,7 @@ The following are optional:
   -minbases=N        minimum percentile of matching bases, default is 90.0
   -minmins=N         minimum number of matching minimizers, default is 3
   -minov=N           minimum overlap in number of bases, default is 5
+  -show=N            show best only (1) or all patterns (0) matching a read pair, default is 1
   -threads=N         number of threads, default is 8
   -w=N               window length in number of bases, default is 5
 </code></pre>
@@ -144,31 +145,30 @@ reference genome.  Use this file only when searching human RNA and DNA.
 The kmerank program is provided to construct rank tables for other species.</p>
 <p><em>Since fuzzion2 reads the 4-GB rank table into memory, be sure to run fuzzion2 with
 at least 5 GB of memory.</em></p>
-<p>fuzzion2 examines each read-pair to see if it matches any of the patterns in the
-pattern file.  Read-pairs are obtained from:</p>
+<p>fuzzion2 examines each read pair to see if it matches any of the patterns in the
+pattern file.  Read pairs are obtained from:</p>
 <ol>
 <li>a single interleaved FASTQ file named by the <code>-ifastq</code> option;</li>
 <li>a pair of FASTQ files identified by the <code>-fastq1</code> and <code>-fastq2</code> options; or</li>
 <li>one or more unaligned Bam files specified on the command line.</li>
 </ol>
-<p>fuzzion2 expects that the mates of a read-pair are adjacent in interleaved FASTQ
+<p>fuzzion2 expects that the mates of a read pair are adjacent in interleaved FASTQ
 files and unaligned Bam files.  If a pair of FASTQ files is specified, the mates
 are separated; "Read 1" mates are in the first file and corresponding "Read 2"
 mates are in the second file.  If the name of a FASTQ file ends with ".gz",
 fuzzion2 assumes that the file is gzipped and uses gunzip to decompress the data.</p>
 <h3 id="output">Output</h3>
-<p>Each read-pair that matches a pattern is a "hit" and is written along with the
+<p>Each read pair that matches a pattern is a "hit" and is written along with the
 pattern on three lines to the standard output stream.  In the following example,
-<code>BCR-ABL1</code> is the name of the pattern and 208 is the insert size of the read-pair
-aligned to the pattern.  The second column of the first line shows the substring
-of the pattern sequence that matches the read-pair.  The second and third lines
-show the read name and entire sequence of each mate.</p>
-<pre><code>pattern BCR-ABL1 208         CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAA]GGAAGA[AGCCCTTCAGCGGCCAGTAGCATCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
-EXAMPLE:1105:12909:66982/2   CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAAGGAAGAAGCCCTTCAGCGGCCA
-EXAMPLE:1105:12909:66982/1                                                                                                                TCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
+<code>BCR-ABL1</code> is the name of the pattern.  The second column of the first line shows
+the substring of the pattern sequence that matches the read pair.  The second and
+third lines show the read name and entire sequence of each mate.</p>
+<pre><code>pattern BCR-ABL1                 CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAA]GGAAGA[AGCCCTTCAGCGGCCAGTAGCATCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
+read EXAMPLE:1105:12909:66982/2  CATCCGTGGAGCTGCAGATGCTGACCAACTCGTGTGTGAAACTCCAGACTGTCCACAGCATTCCGCTGACCATCAATAAGGAAGAAGCCCTTCAGCGGCCA
+read EXAMPLE:1105:12909:66982/1                                                                                                               TCTGACTTTGAGCCTCAGGGTCTGAGTGAAGCCGCTCGTTGGAACTCCAAGGAAAACCTTCTCGCTGGACCCAGTGAAAATGACCCCAACCTTTTCGTTGC
 </code></pre>
 <p>A final line is written to the standard output stream showing the total number
-of read-pairs processed by the program.</p>
+of read pairs processed by the program.</p>
 <p>When multithreading is used (i.e., the value of the <code>-threads</code> option is greater
 than 1), the order of the hits is indeterminate and a simple <code>diff</code> cannot be
 used to compare output files.  It is therefore recommended to run the fuzzort
@@ -183,7 +183,7 @@ and the hits of a pattern are grouped together.</p>
 </code></pre>
 <p>The file named <code>my_output.txt</code> should match the provided file named
 <code>example_output.txt</code>.</p>
-<p>If the read-pairs for a sample are stored in multiple pairs of FASTQ files, run
+<p>If the read pairs for a sample are stored in multiple pairs of FASTQ files, run
 fuzzion2 once for each pair of FASTQ files and concatenate the resulting output
 files.  Then run fuzzort on the concatenated file to get a single sorted file
 of hits.</p>
@@ -226,16 +226,13 @@ limitations under the License.</p></div>
                 <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
             </div>
             <div class="modal-body">
-                <p>
-                    From here you can search these documents. Enter
-                    your search terms below.
-                </p>
+                <p>From here you can search these documents. Enter your search terms below.</p>
                 <form>
                     <div class="form-group">
                         <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
                     </div>
                 </form>
-                <div id="mkdocs-search-results"></div>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
             </div>
             <div class="modal-footer">
             </div>
@@ -286,6 +283,6 @@ limitations under the License.</p></div>
 </html>
 
 <!--
-MkDocs version : 1.1.2
-Build Date UTC : 2021-05-04 21:26:43.885655+00:00
+MkDocs version : 1.2.1
+Build Date UTC : 2021-07-09 18:46:01.940209+00:00
 -->
