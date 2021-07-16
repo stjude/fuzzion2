@@ -25,7 +25,7 @@ inputs:
       separate: false
       shellQuote: false
       position: 2
-    'sbg:fileTypes': .fq
+    'sbg:fileTypes': '.fq, .fastq, .fq.gz, .fastq.gz'
   - id: fastq2
     type: File?
     inputBinding:
