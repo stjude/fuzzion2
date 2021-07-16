@@ -33,7 +33,7 @@ inputs:
       separate: false
       shellQuote: false
       position: 3
-    'sbg:fileTypes': .fq
+    'sbg:fileTypes': '.fq, .fastq, .fq.gz, .fastq.gz'
 outputs:
   - id: example_out
     type: stdout
