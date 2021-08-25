@@ -73,5 +73,7 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}_kmerank:latest
             ghcr.io/${{ env.REPO_LOWER }}_kmerank:${{ env.SHORT_SHA }}
+            cgc-images.sbgenomics.com/${{ env.REPO_LOWER }}_kmerank:latest
+            cgc-images.sbgenomics.com/${{ env.REPO_LOWER }}_kmerank:${{ env.SHORT_SHA }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }} 
