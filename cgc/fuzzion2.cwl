@@ -45,5 +45,5 @@ requirements:
   - class: ResourceRequirement
     ramMin: 5000
   - class: DockerRequirement
-    dockerPull: 'cgc-images.sbgenomics.com/cjrash/stjude/fuzzion2:latest'
+    dockerPull: 'cgc-images.sbgenomics.com/stjude/fuzzion2:latest'
 stdout: output.txt
