@@ -60,6 +60,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}_fuzzort:latest
             ghcr.io/${{ env.REPO_LOWER }}_fuzzort:${{ env.SHORT_SHA }}
+            cgc-images.sbgenomics.com/${{ env.REPO_LOWER }}_fuzzort:latest
+            cgc-images.sbgenomics.com/${{ env.REPO_LOWER }}_fuzzort:${{ env.SHORT_SHA }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }} 
       - 
