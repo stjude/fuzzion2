@@ -40,7 +40,7 @@ struct MatchCompare // for sorting a MatchVector
       if (key1 != 0)
          return (key1 > 0);
 
-      int key2 = a.offsetDiff() - b.offsetDiff();
+      int key2 = a.insertSize() - b.insertSize();
 
       if (key2 != 0)
          return (key2 < 0);
@@ -48,6 +48,51 @@ struct MatchCompare // for sorting a MatchVector
       return (a.c1.index < b.c1.index);
    }
 };
+
+//------------------------------------------------------------------------------------
+// Match::possible() returns the maximum possible number of matching bases
+
+int Match::possible() const
+{
+   if (c1.matchingBases == 0)      // c1 is an unmatched mate
+      return c2.length;
+   else if (c2.matchingBases == 0) // c2 is an unmatched mate
+      return c1.length;
+   else // matching read-pair
+      return c1.length + c2.length;
+}
+
+//------------------------------------------------------------------------------------
+// Match::insertSize() returns the insert size of this match
+
+int Match::insertSize() const
+{
+   if (c1.matchingBases == 0)       // c1 is an unmatched mate
+      return c2.length;
+   else if (c2.matchingBases == 0)  // c2 is an unmatched mate
+      return c1.length;
+   else if (c1.offset <= c2.offset) // c1 is aligned ahead of c2
+      return std::max(c1.length, c2.offset - c1.offset + c2.length);
+   else                             // c2 is aligned ahead of c1
+      return std::max(c2.length, c1.offset - c2.offset + c1.length);
+}
+
+//------------------------------------------------------------------------------------
+// Match::leftmost1() returns true if c1 is the left-most matching read
+
+bool Match::leftmost1() const
+{
+   return (c1.matchingBases > 0 && (c2.matchingBases == 0 || c1.offset <= c2.offset));
+}
+
+//------------------------------------------------------------------------------------
+// Match::rightmost2() returns true if c2 is the right-most matching read
+
+bool Match::rightmost2() const
+{
+   return (c2.matchingBases > 0 && (c1.matchingBases == 0 ||
+           c2.offset + c2.length >= c1.offset + c1.length));
+}
 
 //------------------------------------------------------------------------------------
 // computeMinMatches() returns the minimum number of matching bases for the given
@@ -101,12 +146,12 @@ static int lengthOfLCS(const std::string& strA, int offsetA, int lenA,
 //------------------------------------------------------------------------------------
 // getLocations() extracts minimizers from a sequence, looks them up in a pattern map,
 // and obtains locations of the minimizers within patterns; only eligible patterns are
-// considered; passing NULL in place of a BoolVector means all patterns are eligible
+// considered; passing NULL in the last parameter means all patterns are eligible
 
 static void getLocations(const std::string& sequence, PatternMap *patternMap,
                          MinimizerWindowLength w, const KmerRankTable *rankTable,
-			 Minimizer maxMinimizer, BoolVector *eligiblePattern,
-			 LocationVector& locationVector)
+			 Minimizer maxMinimizer, LocationVector& locationVector,
+			 BoolVector *eligiblePattern=NULL)
 {
    bool allPatternsEligible = (eligiblePattern == NULL);
 
@@ -148,14 +193,23 @@ static void getLocations(const std::string& sequence, PatternMap *patternMap,
 }
 
 //------------------------------------------------------------------------------------
-// getCandidates() identifies candidate matches of a sequence and stores them in a map
+// getCandidates() identifies candidate matches of a sequence and stores them in a
+// map; only eligible patterns are considered; passing NULL in the last parameter
+// means all patterns are eligible
 
 static void getCandidates(const std::string& sequence,
-                          const PatternVector *patternVector, double minBases,
-			  int minMins, const LocationVector& locationVector,
-			  CandidateMap& candidateMap)
+                          const PatternVector *patternVector, PatternMap *patternMap,
+			  MinimizerWindowLength w, const KmerRankTable *rankTable,
+			  Minimizer maxMinimizer, double minBases, int minMins,
+			  CandidateMap& cmap, BoolVector *eligiblePattern=NULL)
 {
-   int minMatches = computeMinMatches(sequence.length(), minBases);
+   LocationVector locationVector;
+
+   getLocations(sequence, patternMap, w, rankTable, maxMinimizer, locationVector,
+                eligiblePattern);
+
+   int seqlen     = sequence.length();
+   int minMatches = computeMinMatches(seqlen, minBases);
 
    int i = 0, numLocations = locationVector.size();
 
@@ -171,98 +225,49 @@ static void getCandidates(const std::string& sequence,
          count++;
 
       if (count < minMins)
-         continue; // not enough matching uncommon minimizers
+         continue; // not enough matching minimizers
 
-      const std::string& patternSequence = (*patternVector)[location.index].sequence;
+      const std::string& psequence = (*patternVector)[location.index].sequence;
 
-      int patternLen =
-         std::min(sequence.length(), patternSequence.length() - location.offset);
+      int pseqlen = psequence.length();
+      int pcmplen = std::min(seqlen, pseqlen - location.offset);
 
-      int matchingBases =
-         lengthOfLCS(sequence, 0, sequence.length(), patternSequence, location.offset,
-                     patternLen);
+      int matchingBases = lengthOfLCS(sequence, 0, seqlen,
+                                      psequence, location.offset, pcmplen);
 
       if (matchingBases < minMatches)
          continue; // not enough matching bases
 
       // found a candidate; put it in the map
-      CandidateMap::iterator cpos = candidateMap.find(location.index);
+      CandidateMap::iterator cpos = cmap.find(location.index);
 
-      if (cpos == candidateMap.end())
+      if (cpos == cmap.end())
       {
-         candidateMap.insert(std::make_pair(location.index, CandidateVector()));
-	 cpos = candidateMap.find(location.index);
+         cmap.insert(std::make_pair(location.index, CandidateVector()));
+	 cpos = cmap.find(location.index);
       }
 
       CandidateVector& candidateVector = cpos->second;
 
-      candidateVector.push_back(Candidate(location, matchingBases));
+      candidateVector.push_back(Candidate(location, seqlen, matchingBases));
    }
 }
 
 //------------------------------------------------------------------------------------
-// getAllCandidates() identifies candidate matches for each read of a read pair and
-// puts them in a separate map for each read; true is returned if there is at least
-// one candidate match for each read
+// getBestPair() finds the best read-pair match for each pattern if bestOverall is
+// false, or the best overall read-pair match, across all patterns, if bestOverall is
+// true
 
-static bool getAllCandidates(const std::string& sequence1,
-                             const std::string& sequence2,
-			     const PatternVector *patternVector,
-			     PatternMap *patternMap,
-			     MinimizerWindowLength w, const KmerRankTable *rankTable,
-			     Minimizer maxMinimizer, double minBases, int minMins,
-			     CandidateMap& cmap1, CandidateMap& cmap2)
+static void getBestPair(CandidateMap& cmap1, CandidateMap& cmap2, int maxInsert,
+                        int maxTrim, bool bestOverall, MatchVector& matchVector)
 {
-   LocationVector locationVector;
-
-   // get candidate matches for the first read
-
-   getLocations(sequence1, patternMap, w, rankTable, maxMinimizer, NULL,
-                locationVector);
-
-   getCandidates(sequence1, patternVector, minBases, minMins, locationVector, cmap1);
-
-   if (cmap1.size() == 0)
-      return false; // didn't find any
-
-   locationVector.clear();
-
-   // get candidate matches for the reverse complement of the second read; only
-   // patterns with candidate matches of the first read are eligible
-
-   std::string revcomp = stringReverseComplement(sequence2);
-
-   BoolVector eligiblePattern(patternVector->size(), false);
-
-   for (CandidateMap::iterator cpos = cmap1.begin(); cpos != cmap1.end(); ++cpos)
-      eligiblePattern[cpos->first] = true;
-
-   getLocations(revcomp, patternMap, w, rankTable, maxMinimizer, &eligiblePattern,
-                locationVector);
-
-   getCandidates(revcomp, patternVector, minBases, minMins, locationVector, cmap2);
-
-   return (cmap2.size() > 0);
-}
-
-//------------------------------------------------------------------------------------
-// pairupCandidates() finds the best match for each pattern if bestOverall is false;
-// otherwise, it finds only the best overall match across all patterns
-
-static void pairupCandidates(CandidateMap& cmap1, CandidateMap& cmap2,
-                             int maxOffsetDiff, bool bestOverall,
-			     MatchVector& matchVector)
-{
-   Location  location(0, 0);
-   Candidate candidate(location, 0);
-   Match bestMatch(candidate, candidate); // will hold best match found so far
-   bool foundMatch = false;               // nothing found yet
+   int best = 0;
 
    for (CandidateMap::iterator cpos1 = cmap1.begin(); cpos1 != cmap1.end(); ++cpos1)
    {
       CandidateMap::iterator cpos2 = cmap2.find(cpos1->first);
       if (cpos2 == cmap2.end())
-         continue; // nothing for this pattern
+         continue;
 
       const CandidateVector& cv1 = cpos1->second; int n1 = cv1.size();
       const CandidateVector& cv2 = cpos2->second; int n2 = cv2.size();
@@ -272,50 +277,120 @@ static void pairupCandidates(CandidateMap& cmap1, CandidateMap& cmap2,
 	 {
             Match match(cv1[i], cv2[j]);
 
-	    int offsetDiff    = match.offsetDiff();
-	    int matchingBases = match.matchingBases();
+	    if (match.insertSize() > maxInsert ||
+                match.c1.offset - match.c2.offset > maxTrim)
+               continue; // insert size too large or second read aligned too far
+                         // ahead of first read
 
-	    if (offsetDiff >= 0 && offsetDiff <= maxOffsetDiff && (!foundMatch ||
-                matchingBases >  bestMatch.matchingBases() ||
-		matchingBases == bestMatch.matchingBases() &&
-		offsetDiff < bestMatch.offsetDiff()))
+	    if (best == matchVector.size())
+               matchVector.push_back(match); // save first match, best so far
+	    else
 	    {
-               foundMatch = true;
-	       bestMatch  = match;
+               int matchingBases     = match.matchingBases();
+	       int mostMatchingBases = matchVector[best].matchingBases();
+
+	       if (matchingBases >  mostMatchingBases ||
+                   matchingBases == mostMatchingBases &&
+		   match.insertSize() < matchVector[best].insertSize())
+                  matchVector[best] = match; // overwrite best match with new best
 	    }
 	 }
 
-      if (!bestOverall && foundMatch)
-      {
-         matchVector.push_back(bestMatch); // best match for this pattern
-	 foundMatch = false;               // reset for next pattern
-      }
+      if (!bestOverall && best < matchVector.size())
+         best++; // advance for next pattern
    }
+}
 
-   if (foundMatch)
-      matchVector.push_back(bestMatch);    // best overall match
+//------------------------------------------------------------------------------------
+// getBestSingle() finds the best single-read match for each pattern if bestOverall is
+// false, or the best overall single-read match, across all patterns, if bestOverall
+// is true
 
-   if (matchVector.size() > 1)
-      std::sort(matchVector.begin(), matchVector.end(), MatchCompare());
+static void getBestSingle(CandidateMap& cmap, bool bestOverall, bool firstRead,
+                          int mateLength, MatchVector& matchVector)
+{
+   int best = (bestOverall ? 0 : matchVector.size());
+
+   for (CandidateMap::iterator cpos = cmap.begin(); cpos != cmap.end(); ++cpos)
+   {
+      const CandidateVector& cv = cpos->second; int n = cv.size();
+
+      for (int i = 0; i < n; i++)
+         if (best == matchVector.size() ||
+             cv[i].matchingBases > matchVector[best].matchingBases())
+	 {
+            Location location(cv[i].index, cv[i].offset);
+	    Candidate mate(location, mateLength, 0); // unmatched mate
+
+	    const Candidate& c1 = (firstRead ? cv[i] : mate);
+	    const Candidate& c2 = (firstRead ? mate  : cv[i]);
+
+	    Match match(c1, c2);
+
+	    if (best == matchVector.size())
+               matchVector.push_back(match); // save first match, best so far
+	    else
+               matchVector[best] = match;    // overwrite best match with new best
+	 }
+
+      if (!bestOverall && best < matchVector.size())
+         best++; // advance for next pattern
+   }
 }
 
 //------------------------------------------------------------------------------------
 // getMatches() finds pattern matches for the given read pair and sorts them by
 // descending number of matching bases; if bestOverall is true, only the best overall
-// match is identified
+// match is identified; if findSingle is true, single-read matches are sought when
+// there are no read-pair matches
 
 void getMatches(const std::string& sequence1, const std::string& sequence2,
                 const PatternVector *patternVector, PatternMap *patternMap,
 		MinimizerWindowLength w, const KmerRankTable *rankTable,
 		Minimizer maxMinimizer, double minBases, int minMins, int maxInsert,
-		bool bestOverall, MatchVector& matchVector)
+		int maxTrim, bool bestOverall, bool findSingle,
+		MatchVector& matchVector)
 {
    CandidateMap cmap1, cmap2;
 
-   if (getAllCandidates(sequence1, sequence2, patternVector, patternMap, w, rankTable,
-                        maxMinimizer, minBases, minMins, cmap1, cmap2))
-      pairupCandidates(cmap1, cmap2, maxInsert - sequence2.length(), bestOverall,
-                       matchVector);
+   getCandidates(sequence1, patternVector, patternMap, w, rankTable, maxMinimizer,
+                 minBases, minMins, cmap1);
+
+   if (cmap1.size() == 0 && !findSingle)
+      return;
+
+   std::string revcomp = stringReverseComplement(sequence2);
+
+   if (findSingle)
+      getCandidates(revcomp, patternVector, patternMap, w, rankTable, maxMinimizer,
+                    minBases, minMins, cmap2);
+   else // we only need to find candidates in certain patterns
+   {
+      BoolVector eligiblePattern(patternVector->size(), false);
+
+      for (CandidateMap::iterator cpos1 = cmap1.begin();
+           cpos1 != cmap1.end(); ++cpos1)
+         eligiblePattern[cpos1->first] = true;
+
+      getCandidates(revcomp, patternVector, patternMap, w, rankTable, maxMinimizer,
+                    minBases, minMins, cmap2, &eligiblePattern);
+   }
+
+   if (cmap1.size() > 0 && cmap2.size() > 0)
+      getBestPair(cmap1, cmap2, maxInsert, maxTrim, bestOverall, matchVector);
+
+   if (matchVector.size() == 0 && findSingle)
+   {
+      // didn't find a matching read-pair; look for single-read matches
+      if (cmap1.size() > 0)
+         getBestSingle(cmap1, bestOverall, true,  sequence2.length(), matchVector);
+
+      if (cmap2.size() > 0)
+         getBestSingle(cmap2, bestOverall, false, sequence1.length(), matchVector);
+   }
+
+   if (matchVector.size() > 1)
+      std::sort(matchVector.begin(), matchVector.end(), MatchCompare());
 }
 
 //------------------------------------------------------------------------------------
@@ -380,11 +455,23 @@ bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
    int offset2 = match.c2.offset;
 
    if (pattern.hasBraces)
-      return (overlapLeft (sequence1, pattern, offset1, minBases, minOverlap) &&
+      return (match.c1.matchingBases > 0 &&
+              overlapLeft (sequence1, pattern, offset1, minBases, minOverlap) &&
               overlapRight(sequence1, pattern, offset1, minBases, minOverlap) ||
+	      match.c2.matchingBases > 0 &&
 	      overlapLeft (sequence2, pattern, offset2, minBases, minOverlap) &&
 	      overlapRight(sequence2, pattern, offset2, minBases, minOverlap));
-   else // pattern has brackets
-      return (overlapLeft (sequence1, pattern, offset1, minBases, minOverlap) &&
-              overlapRight(sequence2, pattern, offset2, minBases, minOverlap));
+
+   // pattern has brackets
+   bool left1  = match.leftmost1();
+   bool right2 = match.rightmost2();
+
+   const std::string& sequenceL = (left1  ? sequence1 : sequence2);
+                  int offsetL   = (left1  ? offset1   : offset2);
+
+   const std::string& sequenceR = (right2 ? sequence2 : sequence1);
+                  int offsetR   = (right2 ? offset2   : offset1);
+
+   return (overlapLeft (sequenceL, pattern, offsetL, minBases, minOverlap) &&
+           overlapRight(sequenceR, pattern, offsetR, minBases, minOverlap));
 }

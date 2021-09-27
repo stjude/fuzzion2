@@ -14,7 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_ID  = "kmerank v1.0.0, copyright 2021 "
+const std::string VERSION_ID  = "kmerank v1.0.2, copyright 2021 "
                                 "St. Jude Children's Research Hospital";
 
 const int DEFAULT_KMER_LENGTH = 15;
@@ -26,28 +26,29 @@ std::string binaryFilename = ""; // name of binary output file
 std::string textFilename   = ""; // name of text output file
 
 //------------------------------------------------------------------------------------
-// showUsage() writes the program's usage to stdout
+// showUsage() writes the program's usage to stderr
 
 void showUsage(const char *progname)
 {
-   std::cout
+   std::cerr
       << VERSION_ID << NEWLINE << NEWLINE
       << "Usage: " << progname << " OPTION ..." << NEWLINE;
 
-   std::cout
+   std::cerr
       << NEWLINE
       << "These options are required:" << NEWLINE
-      << "  -ref=filename  "
+      << "  -ref=filename   "
              << "name of reference genome input file in 2-bit format" << NEWLINE
-      << "  -bin=filename  "
+      << "  -bin=filename   "
              << "name of binary output file" << NEWLINE;
 
-   std::cout
+   std::cerr
       << NEWLINE
       << "The following are optional:" << NEWLINE
-      << "  -k=N           "
-             << "k-mer length, default is " << DEFAULT_KMER_LENGTH << NEWLINE
-      << "  -txt=filename  "
+      << "  -k=N            "
+             << "k-mer length, default is " << DEFAULT_KMER_LENGTH
+	     << ", maximum is " << static_cast<int>(MAX_KMER_LENGTH) << NEWLINE
+      << "  -txt=filename   "
              << "name of text output file, default is none" << NEWLINE;
 }
 

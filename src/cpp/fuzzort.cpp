@@ -15,7 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 
-const std::string VERSION_ID = "fuzzort v1.0.1, copyright 2021 "
+const std::string VERSION_ID = "fuzzort v1.0.2, copyright 2021 "
                                "St. Jude Children's Research Hospital";
 
 const std::string FUZZION2   = "fuzzion2 ";
@@ -24,11 +24,11 @@ const std::string READ       = "read ";
 const std::string READ_PAIRS = "read-pairs ";
 
 //------------------------------------------------------------------------------------
-// showUsage() writes the program's usage to stdout
+// showUsage() writes the program's usage to stderr
 
 void showUsage(const char *progname)
 {
-   std::cout
+   std::cerr
       << VERSION_ID << NEWLINE << NEWLINE
       << "Usage: " << progname << " < fuzzion2_hits > sorted_hits" << NEWLINE;
 }
@@ -63,19 +63,6 @@ struct HitCompare
 void sortHits(HitVector& hitVector)
 {
    std::sort(hitVector.begin(), hitVector.end(), HitCompare());
-}
-
-//------------------------------------------------------------------------------------
-// hasPrefix() returns true if the given string has the given prefix
-
-bool hasPrefix(const std::string& s, const std::string& prefix)
-{
-   int prefixLen = prefix.length();
-
-   if (s.length() < prefixLen)
-      return false;
-
-   return (s.substr(0, prefixLen) == prefix);
 }
 
 //------------------------------------------------------------------------------------

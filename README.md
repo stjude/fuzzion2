@@ -1,7 +1,26 @@
 # fuzzion2
 
-fuzzion2 searches RNA and DNA to find read pairs that match fusion patterns.
-  
+There are six programs in the Fuzzion2 suite: `fuzzion2`, `fuzzort`,
+`fuzzum`, `fuzzion2html`, `fuzzall`, and `kmerank`.
+
+The main program is `fuzzion2` which searches paired-end RNA or DNA to
+identify read pairs that match fusion patterns.  The matching read pairs
+are sorted by `fuzzort`; summarized by `fuzzum`; and converted to HTML by
+`fuzzion2html` for viewing using a browser.  The `fuzzall` program
+aggregates summaries produced by `fuzzum`.
+
+The `fuzzion2` program requires as input a k-mer rank table.  Download
+this file from `http://ftp.stjude.org/pub/software/fuzzion2_hg38_k15.krt`.
+It holds a 4-GB 15-mer rank table that was constructed from the GRCh38 human
+reference genome.  Use this file only when searching human RNA or DNA.
+The `kmerank` program is provided to construct k-mer rank tables for other
+species.  Depending on the size of the table under construction, you may
+need to run `kmerank` with as much as 21 GB of memory.
+
+*When `fuzzion2` reads a 4-GB k-mer rank table into memory, be sure to run
+it with at least 5 GB of memory.*  Each of the other programs in the Fuzzion2
+suite requires less than 1 GB of memory.
+
 ## Quick Start
 
 ### Docker
@@ -16,7 +35,7 @@ $ cd fuzzion2
 $ make
 ```
 
-This builds executable files named `fuzzion2`, `fuzzort`, and `kmerank` and
+This builds executable files for all six programs of the Fuzzion2 suite and
 puts them in `build/bin`.
 
 #### Dependencies
@@ -42,61 +61,51 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HTSLIB/lib
 
 ## Usage
 
-Running fuzzion2 with no command-line arguments displays its usage.
-
 ```
-Usage: fuzzion2 OPTION ... [ubam_filename ...] > matches
+Usage: fuzzion2 OPTION ... [ubam_filename ...] > hits
 
 These options are required:
-  -pattern=filename  name of pattern input file
-  -rank=filename     name of binary  input file containing the k-mer rank table
+  -pattern=filename   name of pattern input file
+  -rank=filename      name of binary  input file containing the k-mer rank table
 
 The following are optional:
-  -fastq1=filename   name of FASTQ Read 1 input file
-  -fastq2=filename   name of FASTQ Read 2 input file
-  -ifastq=filename   name of interleaved FASTQ input file (may be /dev/stdin)
-  -maxins=N          maximum insert size in bases, default is 500
-  -maxrank=N         maximum rank percentile of minimizers, default is 95.0
-  -minbases=N        minimum percentile of matching bases, default is 90.0
-  -minmins=N         minimum number of matching minimizers, default is 3
-  -minov=N           minimum overlap in number of bases, default is 5
-  -show=N            show best only (1) or all patterns (0) matching a read pair, default is 1
-  -threads=N         number of threads, default is 8
-  -w=N               window length in number of bases, default is 5
+  -fastq1=filename    name of FASTQ Read 1 input file
+  -fastq2=filename    name of FASTQ Read 2 input file
+  -ifastq=filename    name of interleaved FASTQ input file (may be /dev/stdin)
+
+The following are optional:
+   N is a numeric value, e.g., -threads=4
+  -maxins=N     maximum insert size in bases. . . . . . . . . . . . default 500
+  -maxrank=N    maximum rank percentile of minimizers . . . . . . . default 95.0
+  -maxtrim=N    maximum bases second read aligned ahead of first. . default 5
+  -minbases=N   minimum percentile of matching bases. . . . . . . . default 90.0
+  -minmins=N    minimum number of matching minimizers . . . . . . . default 3
+  -minov=N      minimum overlap in number of bases. . . . . . . . . default 5
+  -show=N       show best only (1) or all patterns (0) that match . default 1
+  -single=N     show single-read (1) or just read-pair (0) matches. default 0
+  -threads=N    number of threads . . . . . . . . . . . . . . . . . default 8
+  -w=N          window length in number of bases. . . . . . . . . . default 5
 ```
-
-`N` is a numeric value, e.g., `-threads=4`.
-
-### Input
 
 The `-pattern` option is required and specifies the name of a text file containing
 RNA or DNA patterns.  Look in the `patterns` directory for pattern files provided
 with this distribution.
 
 The `-rank` option is also required and specifies the name of a binary file
-containing a k-mer rank table.  Download this file from
-`http://ftp.stjude.org/pub/software/fuzzion2_hg38_k15.krt`.
-It holds a 4-GB 15-mer rank table that was constructed from the GRCh38 human
-reference genome.  Use this file only when searching human RNA and DNA.
-The kmerank program is provided to construct rank tables for other species.
+containing a k-mer rank table.  See the note above.
 
-*Since fuzzion2 reads the 4-GB rank table into memory, be sure to run fuzzion2 with
-at least 5 GB of memory.*
-
-fuzzion2 examines each read pair to see if it matches any of the patterns in the
+`fuzzion2` examines each read pair to see if it matches any of the patterns in the
 pattern file.  Read pairs are obtained from:
 
 1. a single interleaved FASTQ file named by the `-ifastq` option;
 1. a pair of FASTQ files identified by the `-fastq1` and `-fastq2` options; or
 1. one or more unaligned Bam files specified on the command line.
 
-fuzzion2 expects that the mates of a read pair are adjacent in interleaved FASTQ
+`fuzzion2` expects that the mates of a read pair are adjacent in interleaved FASTQ
 files and unaligned Bam files.  If a pair of FASTQ files is specified, the mates
 are separated; "Read 1" mates are in the first file and corresponding "Read 2"
 mates are in the second file.  If the name of a FASTQ file ends with ".gz",
-fuzzion2 assumes that the file is gzipped and uses gunzip to decompress the data.
-
-### Output
+`fuzzion2` assumes that the file is gzipped and uses `gunzip` to decompress it.
 
 Each read pair that matches a pattern is a "hit" and is written along with the
 pattern on three lines to the standard output stream.  In the following example,
@@ -115,7 +124,7 @@ of read pairs processed by the program.
 
 When multithreading is used (i.e., the value of the `-threads` option is greater
 than 1), the order of the hits is indeterminate and a simple `diff` cannot be
-used to compare output files.  It is therefore recommended to run the fuzzort
+used to compare output files.  It is therefore recommended to run the `fuzzort`
 program to sort the hits.  This program sorts the hits by pattern name so that
 the hits are in a determinate order (and `diff` can be used to compare files)
 and the hits of a pattern are grouped together.
@@ -124,20 +133,46 @@ and the hits of a pattern are grouped together.
 Usage: fuzzort < fuzzion2_hits > sorted_hits
 ```
 
+If the read pairs for a sample are stored in multiple pairs of FASTQ files, run
+`fuzzion2` once for each pair of FASTQ files and concatenate the resulting output
+files.  Then run `fuzzort` on the concatenated file to get a single sorted file
+of hits.
+
+Run `fuzzion2html` to produce an HTML file that provides an attractive display
+of hits when opened in a browser such as Google Chrome or Microsoft Edge.
+SNPs, indels, and sequencing errors are highlighted in the display.
+
+```
+Usage: fuzzion2html OPTION ... < fuzzion2_hits > html
+
+The following is optional:
+  -title=string   string to include in the title of the HTML page
+```
+
+`fuzzum` produces a tab-delimited summary of hits, and these summaries may be
+aggregated using the `fuzzall` program.
+
+```
+Usage: fuzzum OPTION ... < fuzzion2_hits > hit_summary
+
+This option is required:
+  -id=string   identifies the sample
+
+Usage: fuzzall fuzzum_filename ... > pattern_summary
+```
+
 The `test` directory contains some files you can use to run a simple test:
 
 ```
 fuzzion2 -pattern=example_patterns.txt -rank=fuzzion2_hg38_k15.krt \
-   -fastq1=example_input1.fq -fastq2=example_input2.fq | fuzzort > my_output.txt
+   -fastq1=example_input1.fq -fastq2=example_input2.fq > my_output.txt
+
+fuzzort < my_output.txt > my_sorted_output.txt
+
+fuzzion2html -title="Fuzzion2 Example" < my_output.txt > my_output.htm
+
+fuzzum -id=example < my_output.txt > my_output_summary.txt
 ```
-
-The file named `my_output.txt` should match the provided file named
-`example_output.txt`.
-
-If the read pairs for a sample are stored in multiple pairs of FASTQ files, run
-fuzzion2 once for each pair of FASTQ files and concatenate the resulting output
-files.  Then run fuzzort on the concatenated file to get a single sorted file
-of hits.
 
 ## Patterns
 

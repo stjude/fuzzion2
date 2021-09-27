@@ -19,12 +19,13 @@
 class Candidate : public Location // represents a match of a read to a pattern
 {
 public:
-   Candidate(const Location& location, int inMatchingBases)
-      : Location(location), matchingBases(inMatchingBases) { }
+   Candidate(const Location& location, int inLength, int inMatchingBases)
+      : Location(location), length(inLength), matchingBases(inMatchingBases) { }
 
    virtual ~Candidate() { }
 
-   int matchingBases; // number of matching bases
+   int length;        // read length
+   int matchingBases; // number of matching bases; it is zero for an unmatched mate
 };
 
 typedef std::vector<Candidate> CandidateVector;
@@ -41,10 +42,14 @@ public:
 
    virtual ~Match() { }
 
-   int offsetDiff()    const { return c2.offset - c1.offset; }
-   int matchingBases() const { return c1.matchingBases + c2.matchingBases; }
+   int  matchingBases() const { return c1.matchingBases + c2.matchingBases; }
+   int  possible()   const;
+   int  insertSize() const;
 
-   Candidate c1, c2;
+   bool leftmost1()  const;
+   bool rightmost2() const;
+
+   Candidate c1, c2; // if a single-read match, c2 represents the unmatched mate
 };
 
 typedef std::vector<Match> MatchVector;
@@ -55,7 +60,8 @@ void getMatches(const std::string& sequence1, const std::string& sequence2,
                 const PatternVector *patternVector, PatternMap *patternMap,
 		MinimizerWindowLength w, const KmerRankTable *rankTable,
 		Minimizer maxMinimizer, double minBases, int minMins, int maxInsert,
-		bool bestOverall, MatchVector& matchVector);
+		int maxTrim, bool bestOverall, bool findSingle,
+		MatchVector& matchVector);
 
 bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
                    const PatternVector *patternVector, double minBases,

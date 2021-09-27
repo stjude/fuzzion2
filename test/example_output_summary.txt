@@ -1,0 +1,3 @@
+fuzzum v1.0.2	read pairs	pattern
+example	2	BCR-ABL1
+example	1	IKZF1-IKZF1

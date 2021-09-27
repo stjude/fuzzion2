@@ -18,7 +18,7 @@
 #include <stdexcept>
 #include <thread>
 
-const std::string VERSION_NAME   = "fuzzion2 v1.0.1";
+const std::string VERSION_NAME   = "fuzzion2 v1.0.2";
 const std::string COPYRIGHT      =
    "copyright 2021 St. Jude Children's Research Hospital";
 
@@ -27,18 +27,22 @@ const int    THREAD_BATCH_SIZE   = 100000; // number of read pairs in a full bat
 const double DEFAULT_MAX_RANK    = 95;  // default max rank percentile of minimizers
 const double DEFAULT_MIN_BASES   = 90;  // default min percentile of matching bases
 const int    DEFAULT_MAX_INSERT  = 500; // default max insert size in bases
+const int    DEFAULT_MAX_TRIM    = 5;   // default max bases, second ahead of first
 const int    DEFAULT_MIN_MINS    = 3;   // default min number of matching minimizers
 const int    DEFAULT_MIN_OVERLAP = 5;   // default min length of overlap in #bases
 const int    DEFAULT_SHOW        = 1;   // default setting of -show option
+const int    DEFAULT_SINGLE      = 0;   // default setting of -single option
 const int    DEFAULT_THREADS     = 8;   // default number of threads
 const int    DEFAULT_WINDOW_LEN  = 5;   // default length of windows in #bases
 
 double maxRank    = DEFAULT_MAX_RANK;
 double minBases   = DEFAULT_MIN_BASES;
 int    maxInsert  = DEFAULT_MAX_INSERT;
+int    maxTrim    = DEFAULT_MAX_TRIM;
 int    minMins    = DEFAULT_MIN_MINS;
 int    minOverlap = DEFAULT_MIN_OVERLAP;
 int    show       = DEFAULT_SHOW;
+int    single     = DEFAULT_SINGLE;
 int    numThreads = DEFAULT_THREADS;
 int    w          = DEFAULT_WINDOW_LEN;
 
@@ -64,56 +68,67 @@ std::mutex     outputMutex;          // for writing hits to std::cout
 uint64_t       numReadPairs = 0;     // number of read pairs found in the input
 
 //------------------------------------------------------------------------------------
-// showUsage() writes the program's usage to stdout
+// showUsage() writes the program's usage to stderr
 
 void showUsage(const char *progname)
 {
-   std::cout
+   std::cerr
       << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
-      << "Usage: " << progname << " OPTION ... [ubam_filename ...] > matches"
+      << "Usage: " << progname << " OPTION ... [ubam_filename ...] > hits"
       << NEWLINE;
 
-   std::cout
+   std::cerr
       << NEWLINE
       << "These options are required:" << NEWLINE
-      << "  -pattern=filename  "
+      << "  -pattern=filename   "
              << "name of pattern input file" << NEWLINE
-      << "  -rank=filename     "
+      << "  -rank=filename      "
              << "name of binary  input file containing the k-mer rank table"
 	     << NEWLINE;
 
-   std::cout
+   std::cerr
       << NEWLINE
       << "The following are optional:" << NEWLINE
-      << "  -fastq1=filename   "
+      << "  -fastq1=filename    "
              << "name of FASTQ Read 1 input file" << NEWLINE
-      << "  -fastq2=filename   "
+      << "  -fastq2=filename    "
              << "name of FASTQ Read 2 input file" << NEWLINE
-      << "  -ifastq=filename   "
-             << "name of interleaved FASTQ input file (may be /dev/stdin)" << NEWLINE
-      << "  -maxins=N          "
-             << "maximum insert size in bases, default is "
+      << "  -ifastq=filename    "
+             << "name of interleaved FASTQ input file (may be /dev/stdin)" << NEWLINE;
+
+   std::cerr
+      << NEWLINE
+      << "The following are optional:" << NEWLINE
+      << "   N is a numeric value, e.g., -threads=4" << NEWLINE
+      << "  -maxins=N     "
+             << "maximum insert size in bases. . . . . . . . . . . . default "
 	     << DEFAULT_MAX_INSERT << NEWLINE
-      << "  -maxrank=N         "
-             << "maximum rank percentile of minimizers, default is "
+      << "  -maxrank=N    "
+             << "maximum rank percentile of minimizers . . . . . . . default "
              << doubleToString(DEFAULT_MAX_RANK) << NEWLINE
-      << "  -minbases=N        "
-             << "minimum percentile of matching bases, default is "
+      << "  -maxtrim=N    "
+             << "maximum bases second read aligned ahead of first. . default "
+	     << DEFAULT_MAX_TRIM << NEWLINE
+      << "  -minbases=N   "
+             << "minimum percentile of matching bases. . . . . . . . default "
 	     << doubleToString(DEFAULT_MIN_BASES) << NEWLINE
-      << "  -minmins=N         "
-             << "minimum number of matching minimizers, default is "
+      << "  -minmins=N    "
+             << "minimum number of matching minimizers . . . . . . . default "
 	     << DEFAULT_MIN_MINS << NEWLINE
-      << "  -minov=N           "
-             << "minimum overlap in number of bases, default is "
+      << "  -minov=N      "
+             << "minimum overlap in number of bases. . . . . . . . . default "
              << DEFAULT_MIN_OVERLAP << NEWLINE
-      << "  -show=N            "
-             << "show best only (1) or all patterns (0) matching a read pair, "
-             << "default is " << DEFAULT_SHOW << NEWLINE
-      << "  -threads=N         "
-             << "number of threads, default is "
+      << "  -show=N       "
+             << "show best only (1) or all patterns (0) that match . default "
+	     << DEFAULT_SHOW << NEWLINE
+      << "  -single=N     "
+             << "show single-read (1) or just read-pair (0) matches. default "
+	     << DEFAULT_SINGLE << NEWLINE
+      << "  -threads=N    "
+             << "number of threads . . . . . . . . . . . . . . . . . default "
 	     << DEFAULT_THREADS << NEWLINE
-      << "  -w=N               "
-             << "window length in number of bases, default is "
+      << "  -w=N          "
+             << "window length in number of bases. . . . . . . . . . default "
              << DEFAULT_WINDOW_LEN << NEWLINE;
 }
 
@@ -143,9 +158,11 @@ bool parseArgs(int argc, char *argv[])
       if (doubleOpt(opt, "maxrank",  maxRank)         ||
           doubleOpt(opt, "minbases", minBases)        ||
 	  intOpt   (opt, "maxins",   maxInsert)       ||
+	  intOpt   (opt, "maxtrim",  maxTrim)         ||
 	  intOpt   (opt, "minmins",  minMins)         ||
           intOpt   (opt, "minov",    minOverlap)      ||
           intOpt   (opt, "show",     show)            ||
+	  intOpt   (opt, "single",   single)          ||
 	  intOpt   (opt, "threads",  numThreads)      ||
           intOpt   (opt, "w",        w)               ||
           stringOpt(opt, "pattern",  patternFilename) ||
@@ -173,16 +190,17 @@ bool parseArgs(int argc, char *argv[])
          return false; // invalid specification of file names
 
    return (maxRank > 0.0 && maxRank <= 100.0 && minBases > 0.0 && minBases <= 100.0 &&
-	   maxInsert >= 100 && minMins > 0 && minOverlap > 0 &&
-	   (show == 0 || show == 1) && numThreads > 0 && numThreads <= 64 &&
-	   w > 0 && w < 256 && patternFilename != "" && rankFilename != "");
+	   maxInsert > 0 && maxTrim >= 0 && minMins > 0 && minOverlap > 0 &&
+	   (show == 0 || show == 1) && (single == 0 || single == 1) &&
+	   numThreads > 0 && numThreads <= 64 && w > 0 && w < 256 &&
+	   patternFilename != "" && rankFilename != "");
 }
 
 //------------------------------------------------------------------------------------
 // writePattern() writes a pattern to stdout
 
-void writePattern(const Pattern& pattern, std::string sequence, int matchingBases,
-                  int possible, int insertSize)
+void writePattern(const Pattern& pattern, const std::string& sequence,
+                  int matchingBases, int possible, int insertSize)
 {
    std::cout << "pattern " << pattern.name
              << TAB << sequence
@@ -201,7 +219,7 @@ void writePattern(const Pattern& pattern, std::string sequence, int matchingBase
 }
 
 //------------------------------------------------------------------------------------
-// writeRead() writes a read to stdout
+// writeRead() writes a read to stdout; matchingBases is zero for an unmatched mate
 
 void writeRead(const std::string& name, int leadingBlanks,
                const std::string& sequence, int matchingBases, int possible)
@@ -216,7 +234,8 @@ void writeRead(const std::string& name, int leadingBlanks,
 }
 
 //------------------------------------------------------------------------------------
-// writeMatch() writes a match to stdout
+// writeMatch() writes a match to stdout showing the alignment of reads to a pattern;
+// pattern delimiters (i.e., brackets and braces) are accounted for
 
 void writeMatch(const std::string& name1, const std::string& sequence1,
                 const std::string& name2, const std::string& sequence2,
@@ -224,30 +243,31 @@ void writeMatch(const std::string& name1, const std::string& sequence1,
 {
    const Pattern& pattern = (*patternVector)[match.c1.index];
 
-   int offset1    = match.c1.offset;
-   int offset2    = match.c2.offset;
-   int offsetDiff = match.offsetDiff();
+   int offset1 = match.c1.offset;
+   int offset2 = match.c2.offset;
 
-   int plen = pattern.sequence.length();
+   int leftOffset = std::min(offset1, offset2);
+   int fullLength = pattern.displaySequence.length();
+   int displayLen = std::min(match.insertSize() + 2, fullLength - leftOffset);
 
-   int len1 = std::min((int)sequence1.length(), plen - offset1);
-   int len2 = std::min((int)sequence2.length(), plen - offset2);
+   std::string displaySeq = pattern.displaySequence.substr(leftOffset, displayLen);
 
-   int displayLen = std::max(len1, len2 + offsetDiff) + 2;
+   writePattern(pattern, displaySeq, match.matchingBases(), match.possible(),
+                match.insertSize());
 
-   int insertSize = offsetDiff + sequence2.length();
+   int leading1 = 0, leading2 = 0; // number of leading blanks
 
-   int leadingBlanks = offsetDiff + (offset2 >= plen - pattern.rightBases ? 2 :
-                                    (offset2 >= pattern.leftBases ? 1 : 0));
+   if (offset1 < offset2)      // first read aligns ahead of second read
+      leading2 = offset2 - offset1 +
+                 (offset2 >= pattern.sequence.length() - pattern.rightBases ? 2 :
+		 (offset2 >= pattern.leftBases ? 1 : 0));
+   else if (offset2 < offset1) // second read aligns ahead of first read
+      leading1 = offset1 - offset2 +
+                 (offset1 >= pattern.sequence.length() - pattern.rightBases ? 2 :
+		 (offset1 >= pattern.leftBases ? 1 : 0));
 
-   writePattern(pattern, pattern.displaySequence.substr(offset1, displayLen),
-                match.matchingBases(), sequence1.length() + sequence2.length(),
-		insertSize);
-
-   writeRead(name1, 0, sequence1, match.c1.matchingBases, sequence1.length());
-
-   writeRead(name2, leadingBlanks, sequence2, match.c2.matchingBases,
-             sequence2.length());
+   writeRead(name1, leading1, sequence1, match.c1.matchingBases, match.c1.length);
+   writeRead(name2, leading2, sequence2, match.c2.matchingBases, match.c2.length);
 }
 
 //------------------------------------------------------------------------------------
@@ -259,7 +279,8 @@ void processOrientation(const std::string& name1, const std::string& sequence1,
    MatchVector matchVector;
 
    getMatches(sequence1, sequence2, patternVector, patternMap, w, rankTable,
-              maxMinimizer, minBases, minMins, maxInsert, (show == 1), matchVector);
+              maxMinimizer, minBases, minMins, maxInsert, maxTrim, (show == 1),
+	      (single == 1), matchVector);
 
    int numMatches = matchVector.size();
    if (numMatches == 0)
