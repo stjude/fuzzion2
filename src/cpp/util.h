@@ -35,4 +35,6 @@ std::string doubleToString(double d);
 
 std::string intToStringLeadingZeros(int i, int width);
 
+bool hasPrefix(const std::string& s, const std::string& prefix);
+
 #endif

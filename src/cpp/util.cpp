@@ -161,3 +161,16 @@ std::string intToStringLeadingZeros(int i, int width)
 
    return stream.str();
 }
+
+//------------------------------------------------------------------------------------
+// hasPrefix() returns true if the given string has the given prefix
+
+bool hasPrefix(const std::string& s, const std::string& prefix)
+{
+   int prefixLen = prefix.length();
+
+   if (s.length() < prefixLen)
+      return false;
+
+   return (s.substr(0, prefixLen) == prefix);
+}
