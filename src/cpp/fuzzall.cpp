@@ -141,7 +141,7 @@ void readFuzzumFile(const std::string& filename, PatternMap& pmap,
    std::string  headingLine, line;
    StringVector headingCol;
 
-   if (!std::getline(infile, headingLine))
+   if (!getline(infile, headingLine))
       throw std::runtime_error("empty file " + filename);
 
    int numCols = splitString(headingLine, headingCol);
@@ -155,7 +155,7 @@ void readFuzzumFile(const std::string& filename, PatternMap& pmap,
    for (int i = MIN_HEADING_COLS; i < numCols; i++)
       annotationHeading.push_back(headingCol[i]);
 
-   while (std::getline(infile, line))
+   while (getline(infile, line))
    {
       if (hasPrefix(line, FUZZUM)) // found another heading line
          if (line == headingLine)

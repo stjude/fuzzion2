@@ -635,7 +635,7 @@ uint64_t readMatches(PatternMap& pmap, std::string& version,
    std::string headingLine, line1, line2, line3;
    StringVector headingCol;
 
-   if (!std::getline(std::cin, headingLine))
+   if (!getline(std::cin, headingLine))
       throw std::runtime_error("no input");
 
    int numCols = splitString(headingLine, headingCol);
@@ -654,7 +654,7 @@ uint64_t readMatches(PatternMap& pmap, std::string& version,
    for (int i = MIN_HEADING_COLS; i < numCols; i++)
       annotationHeading.push_back(headingCol[i]);
 
-   while (std::getline(std::cin, line1))
+   while (getline(std::cin, line1))
    {
       if (hasPrefix(line1, FUZZION2)) // found another heading line
          if (line1 == headingLine)
@@ -679,10 +679,10 @@ uint64_t readMatches(PatternMap& pmap, std::string& version,
       if (!hasPrefix(line1, PATTERN) ||
           splitString(line1, col1) != numCols ||
           splitString(col1[0], part1, ' ') != 2 || part1[1] == "" ||
-          !std::getline(std::cin, line2) || !hasPrefix(line2, READ) ||
+          !getline(std::cin, line2) || !hasPrefix(line2, READ) ||
 	  splitString(line2, col2) != READ_COLS ||
 	  splitString(col2[0], part2, ' ') != 2 || part2[1] == "" ||
-          !std::getline(std::cin, line3) || !hasPrefix(line3, READ) ||
+          !getline(std::cin, line3) || !hasPrefix(line3, READ) ||
 	  splitString(line3, col3) != READ_COLS ||
 	  splitString(col3[0], part3, ' ') != 2 || part3[1] == "")
          throw std::runtime_error("invalid match format in: " + line1);

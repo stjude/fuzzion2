@@ -13,6 +13,23 @@
 #include <sstream>
 
 //------------------------------------------------------------------------------------
+// getline() reads the next line from the input stream and returns true, or returns
+// false if end-of-file was encountered
+
+bool getline(std::istream& stream, std::string& line)
+{
+   if (!std::getline(stream, line))
+      return false;
+
+   // check for Windows line ending
+   int len = line.length();
+   if (len > 0 && line[len - 1] == CRETURN)
+      line = line.substr(0, len - 1); // remove trailing carriage return
+
+   return true;
+}
+
+//------------------------------------------------------------------------------------
 // splitString() splits the given string delimited by the specified delimiter and
 // saves the component strings as elements of a vector; the number of component
 // strings is returned and is equal to the number of delimiters in the string plus one

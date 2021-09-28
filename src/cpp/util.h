@@ -20,10 +20,12 @@ typedef std::vector<std::string> StringVector;
 
 const char TAB     = '\t';
 const char NEWLINE = '\n';
+const char CRETURN = '\r';
 
-int splitString(const std::string& s, StringVector& v, char delimiter=TAB);
+bool getline(std::istream& stream, std::string& line);
+int  splitString(const std::string& s, StringVector& v, char delimiter=TAB);
 
-int stringToNonnegInt(const std::string& s);
+int    stringToNonnegInt(const std::string& s);
 double stringToNonnegDouble(const std::string& s);
 
 bool stringOpt(const StringVector& opt, std::string optname, std::string& optvalue);

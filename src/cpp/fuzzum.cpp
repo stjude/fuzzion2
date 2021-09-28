@@ -101,7 +101,7 @@ void readHits(PatternMap& pmap, StringVector& annotationHeading)
    std::string headingLine, line1, line2, line3;
    StringVector headingCol;
 
-   if (!std::getline(std::cin, headingLine))
+   if (!getline(std::cin, headingLine))
       throw std::runtime_error("no input");
 
    int numCols = splitString(headingLine, headingCol);
@@ -112,7 +112,7 @@ void readHits(PatternMap& pmap, StringVector& annotationHeading)
    for (int i = MIN_HEADING_COLS; i < numCols; i++)
       annotationHeading.push_back(headingCol[i]);
 
-   while (std::getline(std::cin, line1))
+   while (getline(std::cin, line1))
    {
       if (hasPrefix(line1, FUZZION2)) // found another heading line
          if (line1 == headingLine)
@@ -128,8 +128,8 @@ void readHits(PatternMap& pmap, StringVector& annotationHeading)
       if (!hasPrefix(line1, PATTERN) ||
           splitString(line1, col) != numCols ||
           splitString(col[0], part, ' ') != 2 || part[1] == "" ||
-          !std::getline(std::cin, line2) || !hasPrefix(line2, READ) ||
-          !std::getline(std::cin, line3) || !hasPrefix(line3, READ))
+          !getline(std::cin, line2) || !hasPrefix(line2, READ) ||
+          !getline(std::cin, line3) || !hasPrefix(line3, READ))
          throw std::runtime_error("invalid format in: " + line1);
 
       const std::string& patternName = part[1];

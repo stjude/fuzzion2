@@ -74,7 +74,7 @@ PatternVector *readPatterns(const std::string& filename,
 
    std::string line;
 
-   if (!std::getline(infile, line))
+   if (!getline(infile, line))
       throw std::runtime_error("empty file " + filename);
 
    StringVector heading;
@@ -88,7 +88,7 @@ PatternVector *readPatterns(const std::string& filename,
    for (int i = 2; i < numColumns; i++)
       annotationHeading.push_back(heading[i]);
 
-   while (std::getline(infile, line))
+   while (getline(infile, line))
    {
       StringVector column, annotation;
 

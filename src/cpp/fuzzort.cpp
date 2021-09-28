@@ -71,7 +71,7 @@ void sortHits(HitVector& hitVector)
 
 uint64_t readHits(HitVector& hitVector, std::string& headingLine)
 {
-   if (!std::getline(std::cin, headingLine))
+   if (!getline(std::cin, headingLine))
       throw std::runtime_error("no input");
 
    if (!hasPrefix(headingLine, FUZZION2))
@@ -80,15 +80,15 @@ uint64_t readHits(HitVector& hitVector, std::string& headingLine)
    uint64_t numReadPairs = 0;
    std::string line1, line2, line3;
 
-   while (std::getline(std::cin, line1))
+   while (getline(std::cin, line1))
       if (hasPrefix(line1, FUZZION2)) // found another heading line
          if (line1 == headingLine)
             continue; // ignore it
          else
             throw std::runtime_error("inconsistent heading lines");
       else if (hasPrefix(line1, PATTERN)) // found a hit
-         if (std::getline(std::cin, line2) && hasPrefix(line2, READ) &&
-             std::getline(std::cin, line3) && hasPrefix(line3, READ))
+         if (getline(std::cin, line2) && hasPrefix(line2, READ) &&
+             getline(std::cin, line3) && hasPrefix(line3, READ))
             hitVector.push_back(new Hit(line1, line2, line3));
          else
             throw std::runtime_error("invalid input after " + line1);
