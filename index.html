@@ -220,8 +220,42 @@ fuzzion2html -title=&quot;Fuzzion2 Example&quot; &lt; my_output.txt &gt; my_outp
 fuzzum -id=example &lt; my_output.txt &gt; my_output_summary.txt
 </code></pre>
 <h2 id="patterns">Patterns</h2>
-<p>(This section will describe the distributed pattern files, the format of patterns,
-and the programs provided for creating patterns.)</p>
+<p>Pattern files describe the nucleotide-level breakpoints of sequences of
+interest, e.g., fusions, ITD (internal tandem duplication) boundaries,
+or other targets.</p>
+<h4 id="file-format">File format</h4>
+<p>A pattern file is formatted as tab-delimited text with a header line.  Two columns must be present in the file:</p>
+<ul>
+<li>"pattern" contains the pattern identifier.  In our pattern set
+  this is the gene pairing with a numbered suffix, e.g. BCR-ABL1-01 (note
+  that these identifiers are not stable between releases).</li>
+<li>"sequence" contains the sequence spanning the breakpoint.  A single
+  pair of brackets is used in each sequence to indicate the boundaries
+  of the breakpoint.  Two types of brackets may be
+  used, square brackets ("]" and "[") for fusions, and curly brackets ("}" and "{") for ITD
+  boundaries.  The right or closing bracket appears first, marking the end of the sequence upstream of the breakpoint (e.g. the first gene fusion partner), followed by the left or opening bracket indicating the start of the sequence downstream of the breakpoint (e.g. the second fusion gene partner). Sequence may optionally appear between brackets,
+  indicating either interstitial sequence or a region of microhomology 
+  (i.e., a portion of the sequence that is ambiguous between the two 
+  sides of the breakpoint).  If curly brackets are used, fuzzion2 will
+  require at least one read to span the breakpoint.  Flanking sequence
+  of 400-500 nt on either side of the breakpoint is recommended, or
+  whatever length is appropriate for your sequencing's insert size.</li>
+</ul>
+<p>Additional columns may also be added to the pattern file for any other desired information or annotations.  Below is an example pattern sequence for a BCR-ABL1 fusion:</p>
+<pre><code>AGGGCGCCTTCCATGGAGACGCAGA][AGCCCTTCAGCGGCCAGTAGCATCT
+</code></pre>
+<p>This is a just a very short excerpt of the pattern sequence around the
+breakpoint for illustrative purposes.  Square brackets appear in the
+pattern, indicating a fusion event.  The sequence to the left of the
+"]" is from BCR, the sequence to the right of the "[" is from ABL1.</p>
+<h4 id="sources">Sources</h4>
+<p>The pattern set distributed with fuzzion2 can be found in the "patterns"
+subdirectory of this repo.  This set was generated from fusion and ITD
+data from various pediatric cancer projects and collaborations
+at St. Jude, such as PCGP and NCI TARGET, as well as from clinical
+sequencing.  Patterns were also generated from fusions described in the COSMIC database.  The pattern set is a work in progress.</p>
+<h4 id="programs-for-creating-pattern-files">Programs for creating pattern files</h4>
+<p>Coming soon.</p>
 <h2 id="copyright">COPYRIGHT</h2>
 <p>Copyright 2021 St. Jude Children's Research Hospital</p>
 <h2 id="license">LICENSE</h2>
@@ -315,6 +349,6 @@ limitations under the License.</p></div>
 </html>
 
 <!--
-MkDocs version : 1.2.2
-Build Date UTC : 2021-09-28 18:53:54.792308+00:00
+MkDocs version : 1.2.3
+Build Date UTC : 2021-11-17 19:51:31.288766+00:00
 -->
