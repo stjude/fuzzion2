@@ -23,10 +23,6 @@ suite requires less than 1 GB of memory.
 
 ## Quick Start
 
-### Docker
-
-Coming soon.
-
 ### Developer's Build
 
 ```
