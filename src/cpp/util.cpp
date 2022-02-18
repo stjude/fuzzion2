@@ -4,12 +4,13 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2020 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "util.h"
 #include <iomanip>
+#include <limits>
 #include <sstream>
 
 //------------------------------------------------------------------------------------
@@ -71,13 +72,19 @@ int stringToNonnegInt(const std::string& s)
 {
    const char *str = s.c_str();
 
-   int  value = 0;
-   int  i     = 0;
-   char c     = str[0];
+   uint64_t maxint = std::numeric_limits<int>::max();
+   uint64_t value  = 0;
+
+   int  i = 0;
+   char c = str[0];
 
    while (c >= '0' && c <= '9')
    {
       value = 10 * value + c - '0';
+
+      if (value > maxint) // integer too large
+         return -1;
+
       c = str[++i];
    }
 
@@ -150,7 +157,7 @@ std::string intToString(int i)
 {
    char buffer[100];
 
-   std::sprintf(buffer, "%d", i);
+   std::snprintf(buffer, sizeof(buffer), "%d", i);
 
    return buffer;
 }
@@ -162,7 +169,7 @@ std::string doubleToString(double d)
 {
    char buffer[100];
 
-   std::sprintf(buffer, "%.1f", d);
+   std::snprintf(buffer, sizeof(buffer), "%.1f", d);
 
    return buffer;
 }

@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2020 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -45,10 +45,10 @@ public:
    virtual bool reportMinimizer(Minimizer minimizer, int startIndex,
 		                int windowID, bool finalMinimizer) = 0;
 
-   MinimizerWindowLength w;       // length of each window in bases
-   int currentWindowID;           // ID of current window or (-1) if none
-   Minimizer currentMinimizer;    // minimum hash found so far
-   int currentStartIndex;         // start index of the k-mer having the minimum hash
+   MinimizerWindowLength w;    // length of each window in bases
+   int currentWindowID;        // ID of current window or (-1) if none
+   Minimizer currentMinimizer; // minimum hash found so far
+   int currentStartIndex;      // start index of the k-mer having the minimum hash
 };
 
 //------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -67,5 +67,4 @@ bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
                    const PatternVector *patternVector, double minBases,
 		   int minOverlap, const Match& match);
 
-//------------------------------------------------------------------------------------
 #endif

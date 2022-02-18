@@ -9,8 +9,9 @@ are sorted by `fuzzort`; summarized by `fuzzum`; and converted to HTML by
 `fuzzion2html` for viewing using a browser.  The `fuzzall` program
 aggregates summaries produced by `fuzzum`.
 
-The `fuzzion2` program requires as input a k-mer rank table.  Download
-this file from `http://ftp.stjude.org/pub/software/fuzzion2_hg38_k15.krt`.
+The `fuzzion2` program requires as input a k-mer rank table.
+Download the file named `fuzzion2_hg38_k15.krt` from
+[`https://doi.org/10.5281/zenodo.6122447`](https://doi.org/10.5281/zenodo.6122447).
 It holds a 4-GB 15-mer rank table that was constructed from the GRCh38 human
 reference genome.  Use this file only when searching human RNA or DNA.
 The `kmerank` program is provided to construct k-mer rank tables for other
@@ -21,9 +22,7 @@ need to run `kmerank` with as much as 21 GB of memory.
 it with at least 5 GB of memory.*  Each of the other programs in the Fuzzion2
 suite requires less than 1 GB of memory.
 
-## Quick Start
-
-### Developer's Build
+## Build
 
 ```
 $ git clone https://github.com/stjude/fuzzion2.git
@@ -58,16 +57,17 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HTSLIB/lib
 ## Usage
 
 ```
-Usage: fuzzion2 OPTION ... [ubam_filename ...] > hits
+Usage: fuzzion2 OPTION ... [filename ...] > hits
 
 These options are required:
   -pattern=filename   name of pattern input file
   -rank=filename      name of binary  input file containing the k-mer rank table
 
-The following are optional:
+Specify -fastq1 and -fastq2, or -ifastq or -ubam, or list filenames on command line
   -fastq1=filename    name of FASTQ Read 1 input file
   -fastq2=filename    name of FASTQ Read 2 input file
   -ifastq=filename    name of interleaved FASTQ input file (may be /dev/stdin)
+  -ubam=filename      name of unaligned Bam input file
 
 The following are optional:
    N is a numeric value, e.g., -threads=4
@@ -90,18 +90,25 @@ with this distribution.
 The `-rank` option is also required and specifies the name of a binary file
 containing a k-mer rank table.  See the note above.
 
-`fuzzion2` examines each read pair to see if it matches any of the patterns in the
-pattern file.  Read pairs are obtained from:
+`fuzzion2` expects read pairs as input; single-read formats are unsupported.
+Each read pair is examined to see if it matches any of the patterns in the pattern
+file.  Read pairs are obtained from:
 
-1. a single interleaved FASTQ file named by the `-ifastq` option;
 1. a pair of FASTQ files identified by the `-fastq1` and `-fastq2` options; or
-1. one or more unaligned Bam files specified on the command line.
+1. an interleaved FASTQ file named by the `-ifastq` option; or
+1. an unaligned Bam file named by the `-ubam` option; or
+1. one or more files listed on the command line.
 
 `fuzzion2` expects that the mates of a read pair are adjacent in interleaved FASTQ
-files and unaligned Bam files.  If a pair of FASTQ files is specified, the mates
-are separated; "Read 1" mates are in the first file and corresponding "Read 2"
-mates are in the second file.  If the name of a FASTQ file ends with ".gz",
-`fuzzion2` assumes that the file is gzipped and uses `gunzip` to decompress it.
+and unaligned Bam files.  If a pair of FASTQ files is specified, the mates are
+separated; "Read 1" mates are in one file and corresponding "Read 2" mates are
+in another file.  If the name of a FASTQ file ends with ".gz", `fuzzion2` assumes
+that the file is gzipped and uses `gunzip` to decompress it.
+
+If `-fastq1`, `-fastq2`, `-ifastq`, and `-ubam` options are omitted, `fuzzion2`
+looks for file names on the command line.  The named files can be any combination
+of the above file types and can be listed in any order.  `fuzzion2` automatically
+recognizes and pairs up corresponding "Read 1" and "Read 2" FASTQ files.
 
 Each read pair that matches a pattern is a "hit" and is written along with the
 pattern on three lines to the standard output stream.  In the following example,
@@ -118,6 +125,39 @@ read EXAMPLE:1105:12909:66982/1                                                 
 A final line is written to the standard output stream showing the total number
 of read pairs processed by the program.
 
+#### Additional Options
+
+You will normally not need to specify any of the options described below, but we mention
+them here for completeness.
+
+If there are similar patterns, a read pair may match more than one of them.  By default,
+only the best match is reported.  Specify `-show=0` to see all of them.
+
+By default, both mates of a read pair must match a pattern.  If there are pattern
+sequences too short to match both mates, set `-single=1` to see also matches of one mate
+to patterns.
+
+If there are patterns consisting of very common k-mers, some matches may be missed.
+In this case, the value of the `-maxrank` option should be increased.  By default, this
+option is set to 95.0, which means the 5% most common k-mers in the reference genome are
+ignored.  Increasing the value to 100.0 processes all k-mers, but the program may run
+very slowly.
+
+The `-w` option specifies the window length; reducing this value increases the number
+of minimizers representing each sequence.  The `-minmins` option specifies the minimum
+number of minimizers shared by a read sequence and pattern sequence in a candidate match.
+
+An alignment of a read pair to a pattern sequence is reported as a hit only if the
+alignment has a reasonable insert size (not greater than the value of the `-maxins`
+option); the read pair overlaps each side of the pattern by at least the value of the
+`-minov` option; the percentage of bases in agreement on each side must be at least the
+value of the `-minbases` option; and if the second read of the pair aligns ahead of
+the first read, it is by no more than the value of the `-maxtrim` option.  Normally,
+the first read will align ahead of the second read, but the latter option is provided
+to accommodate imprecise adapter trimming.
+
+#### Postprocessing
+
 When multithreading is used (i.e., the value of the `-threads` option is greater
 than 1), the order of the hits is indeterminate and a simple `diff` cannot be
 used to compare output files.  It is therefore recommended to run the `fuzzort`
@@ -129,11 +169,6 @@ and the hits of a pattern are grouped together.
 Usage: fuzzort < fuzzion2_hits > sorted_hits
 ```
 
-If the read pairs for a sample are stored in multiple pairs of FASTQ files, run
-`fuzzion2` once for each pair of FASTQ files and concatenate the resulting output
-files.  Then run `fuzzort` on the concatenated file to get a single sorted file
-of hits.
-
 Run `fuzzion2html` to produce an HTML file that provides an attractive display
 of hits when opened in a browser such as Google Chrome or Microsoft Edge.
 SNPs, indels, and sequencing errors are highlighted in the display.
@@ -141,9 +176,13 @@ SNPs, indels, and sequencing errors are highlighted in the display.
 ```
 Usage: fuzzion2html OPTION ... < fuzzion2_hits > html
 
-The following is optional:
+The following are optional:
+  -strong=N       minimum overlap of a strong match in #bases, default is 15
   -title=string   string to include in the title of the HTML page
 ```
+
+The input to `fuzzort`, `fuzzion2html`, and `fuzzum` may be the output from a
+single run of `fuzzion2` or the concatenation of outputs from multiple runs.
 
 `fuzzum` produces a tab-delimited summary of hits, and these summaries may be
 aggregated using the `fuzzall` program.
@@ -154,8 +193,21 @@ Usage: fuzzum OPTION ... < fuzzion2_hits > hit_summary
 This option is required:
   -id=string   identifies the sample
 
+The following is optional:
+  -strong=N    minimum overlap of a strong match in #bases, default is 15
+
 Usage: fuzzall fuzzum_filename ... > pattern_summary
 ```
+
+These summaries indicate the number of distinct read pairs matching each pattern,
+and of those the number of "strong" versus "weak" matches.  A match is considered
+to be strong if the alignment of the read pair to the pattern overlaps each side of
+the pattern by at least N bases, where the value of N is given by the `-strong` option.
+Otherwise, a match is regarded as weak due to insufficient overlap.  In `fuzzall`
+output, each sample ID is followed by two numbers in parentheses, e.g., (24/22),
+indicating the number of distinct matches (24) and strong matches (22).
+
+#### Example Run
 
 The `test` directory contains some files you can use to run a simple test:
 
@@ -176,26 +228,32 @@ Pattern files describe the nucleotide-level breakpoints of sequences of
 interest, e.g., fusions, ITD (internal tandem duplication) boundaries,
 or other targets.
 
-#### File format
+#### File Format
 
-A pattern file is formatted as tab-delimited text with a header line.  Two columns must be present in the file:
+A pattern file is formatted as tab-delimited text with a header line.  Two columns
+must be present in the file:
 
 * "pattern" contains the pattern identifier.  In our pattern set
-  this is the gene pairing with a numbered suffix, e.g. BCR-ABL1-01 (note
+  this is the gene pairing with a numbered suffix, e.g., BCR-ABL1-01 (note
   that these identifiers are not stable between releases).
 * "sequence" contains the sequence spanning the breakpoint.  A single
   pair of brackets is used in each sequence to indicate the boundaries
   of the breakpoint.  Two types of brackets may be
-  used, square brackets ("]" and "[") for fusions, and curly brackets ("}" and "{") for ITD
-  boundaries.  The right or closing bracket appears first, marking the end of the sequence upstream of the breakpoint (e.g. the first gene fusion partner), followed by the left or opening bracket indicating the start of the sequence downstream of the breakpoint (e.g. the second fusion gene partner). Sequence may optionally appear between brackets,
-  indicating either interstitial sequence or a region of microhomology 
-  (i.e., a portion of the sequence that is ambiguous between the two 
-  sides of the breakpoint).  If curly brackets are used, fuzzion2 will
-  require at least one read to span the breakpoint.  Flanking sequence
-  of 400-500 nt on either side of the breakpoint is recommended, or
-  whatever length is appropriate for your sequencing's insert size.
+  used, square brackets ("]" and "[") for fusions, and curly brackets ("}" and "{")
+  for ITD boundaries.  The right or closing bracket appears first, marking the end
+  of the sequence upstream of the breakpoint (e.g., the first gene fusion partner),
+  followed by the left or opening bracket indicating the start of the sequence
+  downstream of the breakpoint (e.g., the second fusion gene partner). Sequence may
+  optionally appear between brackets, indicating either interstitial sequence or a
+  region of microhomology (i.e., a portion of the sequence that is ambiguous between
+  the two sides of the breakpoint).  If curly brackets are used, `fuzzion2` will
+  require at least one read to span the breakpoint.  Flanking sequence of 400-500 nt
+  on either side of the breakpoint is recommended, or whatever length is appropriate
+  for your sequencing's insert size.
 
-Additional columns may also be added to the pattern file for any other desired information or annotations.  Below is an example pattern sequence for a BCR-ABL1 fusion:
+Additional columns may also be added to the pattern file for any other desired
+information or annotations.  Below is an example pattern sequence for a BCR-ABL1
+fusion:
 
 ```
 AGGGCGCCTTCCATGGAGACGCAGA][AGCCCTTCAGCGGCCAGTAGCATCT
@@ -206,22 +264,22 @@ breakpoint for illustrative purposes.  Square brackets appear in the
 pattern, indicating a fusion event.  The sequence to the left of the
 "]" is from BCR, the sequence to the right of the "[" is from ABL1.
 
-
 #### Sources
 
-The pattern set distributed with fuzzion2 can be found in the "patterns"
-subdirectory of this repo.  This set was generated from fusion and ITD
-data from various pediatric cancer projects and collaborations
-at St. Jude, such as PCGP and NCI TARGET, as well as from clinical
-sequencing.  Patterns were also generated from fusions described in the COSMIC database.  The pattern set is a work in progress.
+Pattern sets distributed with Fuzzion2 can be found in the "patterns"
+subdirectory of this repository.  These sets were generated from fusion and ITD
+data from various pediatric cancer projects and collaborations at St. Jude, such
+as PCGP and NCI TARGET, as well as from clinical sequencing.  Patterns were also
+generated from fusions described in the COSMIC database.  Pattern sets are works
+in progress.
 
-#### Programs for creating pattern files
+#### Programs for Creating Pattern Files
 
 Coming soon.
 
 ## COPYRIGHT
 
-Copyright 2021 St. Jude Children's Research Hospital
+Copyright 2022 St. Jude Children's Research Hospital
 
 ## LICENSE
 
@@ -229,7 +287,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,

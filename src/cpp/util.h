@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2020 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -16,6 +16,7 @@
 
 inline int roundit(double d) { return static_cast<int>(d + 0.5); }
 
+typedef std::vector<bool> BoolVector;
 typedef std::vector<std::string> StringVector;
 
 const char TAB     = '\t';

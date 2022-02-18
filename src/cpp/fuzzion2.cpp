@@ -5,22 +5,21 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "fastq.h"
+#include "hit.h"
 #include "match.h"
 #include "ubam.h"
-#include <iomanip>
+#include "version.h"
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
 
-const std::string VERSION_NAME   = "fuzzion2 v1.0.2";
-const std::string COPYRIGHT      =
-   "copyright 2021 St. Jude Children's Research Hospital";
+const std::string VERSION_NAME   = FUZZION2 + CURRENT_VERSION;
 
 const int    THREAD_BATCH_SIZE   = 100000; // number of read pairs in a full batch
 
@@ -48,10 +47,12 @@ int    w          = DEFAULT_WINDOW_LEN;
 
 std::string    patternFilename = ""; // name of pattern input file
 std::string    rankFilename    = ""; // name of k-mer rank table binary input file
+
 std::string    fastqFilename1  = ""; // name of FASTQ input file containing Read 1
 std::string    fastqFilename2  = ""; // name of FASTQ input file containing Read 2
 std::string    ifastqFilename  = ""; // name of interleaved FASTQ input file
-StringVector   ubamFilename;         // names of unaligned Bam input files
+std::string    ubamFilename    = ""; // name of unaligned Bam input file
+StringVector   inputFilename;        // names of input files listed on command line
 
 KmerRankTable *rankTable;            // holds the k-mer rank table
 Minimizer      maxMinimizer;         // limit used to identify common minimizers
@@ -59,7 +60,7 @@ Minimizer      maxMinimizer;         // limit used to identify common minimizers
 PatternVector *patternVector;        // holds the input patterns
 PatternMap    *patternMap;           // index of pattern minimizers
 
-PairReader    *pairReader;           // used to get read pairs
+PairReader    *pairReader;           // used to get read pairs from input files
 bool           endOfInput = false;   // set to true when done getting read pairs
 
 std::mutex     inputMutex;           // for getting read pairs
@@ -74,7 +75,7 @@ void showUsage(const char *progname)
 {
    std::cerr
       << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
-      << "Usage: " << progname << " OPTION ... [ubam_filename ...] > hits"
+      << "Usage: " << progname << " OPTION ... [filename ...] > hits"
       << NEWLINE;
 
    std::cerr
@@ -88,13 +89,16 @@ void showUsage(const char *progname)
 
    std::cerr
       << NEWLINE
-      << "The following are optional:" << NEWLINE
+      << "Specify -fastq1 and -fastq2, or -ifastq or -ubam, "
+      << "or list filenames on command line" << NEWLINE
       << "  -fastq1=filename    "
              << "name of FASTQ Read 1 input file" << NEWLINE
       << "  -fastq2=filename    "
              << "name of FASTQ Read 2 input file" << NEWLINE
       << "  -ifastq=filename    "
-             << "name of interleaved FASTQ input file (may be /dev/stdin)" << NEWLINE;
+             << "name of interleaved FASTQ input file (may be /dev/stdin)" << NEWLINE
+      << "  -ubam=filename      "
+             << "name of unaligned Bam input file" << NEWLINE;
 
    std::cerr
       << NEWLINE
@@ -145,7 +149,7 @@ bool parseArgs(int argc, char *argv[])
 
       if (arg[0] != '-')
       {
-         ubamFilename.push_back(arg);
+         inputFilename.push_back(arg);
 	 continue;
       }
 
@@ -169,25 +173,36 @@ bool parseArgs(int argc, char *argv[])
 	  stringOpt(opt, "rank",     rankFilename)    ||
 	  stringOpt(opt, "fastq1",   fastqFilename1)  ||
 	  stringOpt(opt, "fastq2",   fastqFilename2)  ||
-	  stringOpt(opt, "ifastq",   ifastqFilename))
+	  stringOpt(opt, "ifastq",   ifastqFilename)  ||
+	  stringOpt(opt, "ubam",     ubamFilename))
          continue;  // this option has been recognized
 
       return false; // unrecognized option
    }
 
-   if (ubamFilename.size() > 0) // input is coming from unaligned Bam files
+   if (inputFilename.size() > 0)  // list of file names on the command line
    {
-      if (fastqFilename1 != "" || fastqFilename2 != "" || ifastqFilename != "")
-         return false; // invalid specification of file names
+      if (fastqFilename1 != "" || fastqFilename2 != "" || ifastqFilename != "" ||
+          ubamFilename != "")
+         return false;
    }
-   else if (ifastqFilename != "") // input is coming from an interleaved FASTQ file
+   else if (fastqFilename1 != "") // pair of FASTQ input files
    {
-      if (fastqFilename1 != "" || fastqFilename2 != "")
-         return false; // invalid specification of file names
+      if (fastqFilename2 == "" || ifastqFilename != "" || ubamFilename != "")
+         return false;
    }
-   else // input is coming from a pair of FASTQ files
-      if (fastqFilename1 == "" || fastqFilename2 == "")
-         return false; // invalid specification of file names
+   else if (ifastqFilename != "") // interleaved FASTQ input file
+   {
+      if (fastqFilename2 != "" || ubamFilename != "")
+         return false;
+   }
+   else if (ubamFilename != "")   // unaligned Bam input file
+   {
+      if (fastqFilename2 != "")
+         return false;
+   }
+   else // missing input file names
+      return false;
 
    return (maxRank > 0.0 && maxRank <= 100.0 && minBases > 0.0 && minBases <= 100.0 &&
 	   maxInsert > 0 && maxTrim >= 0 && minMins > 0 && minOverlap > 0 &&
@@ -197,40 +212,62 @@ bool parseArgs(int argc, char *argv[])
 }
 
 //------------------------------------------------------------------------------------
-// writePattern() writes a pattern to stdout
+// createInputReader() analyzes the given vector of input file names and returns a
+// newly allocated InputReader object for reading the input files
 
-void writePattern(const Pattern& pattern, const std::string& sequence,
-                  int matchingBases, int possible, int insertSize)
+InputReader *createInputReader(const StringVector& inputFilename)
 {
-   std::cout << "pattern " << pattern.name
-             << TAB << sequence
-	     << TAB << matchingBases
-	     << TAB << possible
-	     << TAB << std::fixed << std::setprecision(1)
-                    << 100.0 * matchingBases / possible
-             << TAB << insertSize;
+   int numInputFiles = inputFilename.size();
+   if (numInputFiles == 0)
+      throw std::runtime_error("no input files");
 
-   int numAnnotations = pattern.annotation.size();
+   BoolVector   processed(numInputFiles, false);
+   StringVector name1(numInputFiles, "");
+   StringVector name2(numInputFiles, "");
 
-   for (int i = 0; i < numAnnotations; i++)
-      std::cout << TAB << pattern.annotation[i];
+   PairReaderVector readerVector;
 
-   std::cout << NEWLINE;
-}
+   for (int i = 0; i < numInputFiles; i++)
+      if (isUbamFile(inputFilename[i]))
+      {
+         readerVector.push_back(new UbamPairReader(inputFilename[i]));
+	 processed[i] = true;
+      }
+      else
+      {
+         bool interleaved;
 
-//------------------------------------------------------------------------------------
-// writeRead() writes a read to stdout; matchingBases is zero for an unmatched mate
+	 if (!isFastqFile(inputFilename[i], name1[i], name2[i], interleaved))
+            throw std::runtime_error("unsupported file type " + inputFilename[i]);
 
-void writeRead(const std::string& name, int leadingBlanks,
-               const std::string& sequence, int matchingBases, int possible)
-{
-   std::cout << "read " << name
-             << TAB << std::string(leadingBlanks, ' ') << sequence
-	     << TAB << matchingBases
-	     << TAB << possible
-	     << TAB << std::fixed << std::setprecision(1)
-                    << 100.0 * matchingBases / possible
-             << NEWLINE;
+	 if (interleaved)
+	 {
+            readerVector.push_back(new InterleavedFastqPairReader(inputFilename[i]));
+	    processed[i] = true;
+	 }
+      }
+
+   // now pair up the unprocessed FASTQ files
+
+   for (int i = 0; i < numInputFiles; i++)
+      if (!processed[i])
+      {
+         for (int j = i + 1; j < numInputFiles; j++)
+            if (!processed[j] && namesMatch(name1[i], name1[j]) &&
+                                 namesMatch(name2[i], name2[j]))
+	    {
+               readerVector.push_back(new FastqPairReader(inputFilename[i],
+                                                          inputFilename[j]));
+	       processed[i] = true;
+	       processed[j] = true;
+	       break;
+	    }
+
+	 if (!processed[i])
+            throw std::runtime_error("unsupported FASTQ file " + inputFilename[i]);
+      }
+
+   return new InputReader(readerVector);
 }
 
 //------------------------------------------------------------------------------------
@@ -252,9 +289,6 @@ void writeMatch(const std::string& name1, const std::string& sequence1,
 
    std::string displaySeq = pattern.displaySequence.substr(leftOffset, displayLen);
 
-   writePattern(pattern, displaySeq, match.matchingBases(), match.possible(),
-                match.insertSize());
-
    int leading1 = 0, leading2 = 0; // number of leading blanks
 
    if (offset1 < offset2)      // first read aligns ahead of second read
@@ -266,8 +300,18 @@ void writeMatch(const std::string& name1, const std::string& sequence1,
                  (offset1 >= pattern.sequence.length() - pattern.rightBases ? 2 :
 		 (offset1 >= pattern.leftBases ? 1 : 0));
 
-   writeRead(name1, leading1, sequence1, match.c1.matchingBases, match.c1.length);
-   writeRead(name2, leading2, sequence2, match.c2.matchingBases, match.c2.length);
+   HitPattern *hitPattern = new HitPattern(pattern.name, displaySeq,
+                                           pattern.annotation, match.matchingBases(),
+					   match.possible(), match.insertSize());
+
+   HitRead *hitRead1 = new HitRead(name1, leading1, sequence1,
+                                   match.c1.matchingBases);
+
+   HitRead *hitRead2 = new HitRead(name2, leading2, sequence2,
+                                   match.c2.matchingBases);
+
+   Hit hit(hitPattern, hitRead1, hitRead2);
+   hit.write();
 }
 
 //------------------------------------------------------------------------------------
@@ -312,6 +356,37 @@ void processOrientation(const std::string& name1, const std::string& sequence1,
 }
 
 //------------------------------------------------------------------------------------
+// processBatch() processes the given batch of read pairs; if an exception is raised,
+// its message is provided
+
+void processBatch(int count,
+                  const StringVector& name1, const StringVector& seq1,
+                  const StringVector& name2, const StringVector& seq2,
+		  std::string& message)
+{
+   try
+   {
+      for (int i = 0; i < count; i++)
+      {
+         processOrientation(name1[i], seq1[i], name2[i], seq2[i]);
+         processOrientation(name2[i], seq2[i], name1[i], seq1[i]);
+      }
+   }
+   catch (const std::runtime_error& error)
+   {
+      message = error.what();
+
+      if (numThreads > 1)
+         inputMutex.lock();
+
+      endOfInput = true;
+
+      if (numThreads > 1)
+         inputMutex.unlock();
+   }
+}
+
+//------------------------------------------------------------------------------------
 // getBatch() gets the next batch of read pairs and returns the number of read pairs
 // obtained; if less than a full batch, end-of-input was reached; if an exception was
 // raised, its message is provided
@@ -351,37 +426,6 @@ int getBatch(StringVector& name1, StringVector& seq1,
    }
 
    return count;
-}
-
-//------------------------------------------------------------------------------------
-// processBatch() processes the given batch of read pairs; if an exception is raised,
-// its message is provided
-
-void processBatch(int count,
-                  const StringVector& name1, const StringVector& seq1,
-                  const StringVector& name2, const StringVector& seq2,
-		  std::string& message)
-{
-   try
-   {
-      for (int i = 0; i < count; i++)
-      {
-         processOrientation(name1[i], seq1[i], name2[i], seq2[i]);
-         processOrientation(name2[i], seq2[i], name1[i], seq1[i]);
-      }
-   }
-   catch (const std::runtime_error& error)
-   {
-      message = error.what();
-
-      if (numThreads > 1)
-         inputMutex.lock();
-
-      endOfInput = true;
-
-      if (numThreads > 1)
-         inputMutex.unlock();
-   }
 }
 
 //------------------------------------------------------------------------------------
@@ -431,45 +475,20 @@ int main(int argc, char *argv[])
       if (patternVector->size() == 0)
          throw std::runtime_error("no patterns in " + patternFilename);
 
-      // write output heading line
-      std::cout << VERSION_NAME
-                << TAB << "sequence"
-		<< TAB << "matching bases"
-		<< TAB << "possible"
-		<< TAB << "% match"
-		<< TAB << "insert size";
-
-      int numAnnotations = annotationHeading.size();
-
-      for (int i = 0; i < numAnnotations; i++)
-         std::cout << TAB << annotationHeading[i];
-
-      std::cout << NEWLINE;
+      writeHitHeadingLine(CURRENT_VERSION, annotationHeading);
 
       patternMap = createPatternMap(patternVector, w, rankTable, maxMinimizer);
 
-      UbamPairReader             *ubam   = NULL;
-      InterleavedFastqPairReader *ifastq = NULL;
-      FastqPairReader            *fastq  = NULL;
+      if (fastqFilename1 != "")
+         pairReader = new FastqPairReader(fastqFilename1, fastqFilename2);
+      else if (ifastqFilename != "")
+         pairReader = new InterleavedFastqPairReader(ifastqFilename);
+      else if (ubamFilename != "")
+         pairReader = new UbamPairReader(ubamFilename);
+      else
+         pairReader = createInputReader(inputFilename);
 
-      if (ubamFilename.size() > 0) // unaligned Bam files
-      {
-         ubam = new UbamPairReader();
-	 ubam->open(ubamFilename);
-	 pairReader = ubam;
-      }
-      else if (ifastqFilename != "") // interleaved FASTQ file
-      {
-         ifastq = new InterleavedFastqPairReader();
-	 ifastq->open(ifastqFilename);
-	 pairReader = ifastq;
-      }
-      else // pair of FASTQ files
-      {
-         fastq = new FastqPairReader();
-	 fastq->open(fastqFilename1, fastqFilename2);
-	 pairReader = fastq;
-      }
+      pairReader->open();
 
       std::string **message = new std::string *[numThreads];
       std::thread **thread  = new std::thread *[numThreads];
@@ -493,13 +512,9 @@ int main(int argc, char *argv[])
          if (*message[i] != "")
             throw std::runtime_error(*message[i]);
 
-      if (ubam)   ubam->close();
-      if (ifastq) ifastq->close();
-      if (fastq)  fastq->close();
+      pairReader->close();
 
-      delete pairReader;
-
-      std::cout << "read-pairs " << numReadPairs << NEWLINE;
+      writeReadPairLine(numReadPairs);
    }
    catch (const std::runtime_error& error)
    {

@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -35,5 +35,4 @@ typedef std::vector<Window> WindowVector;
 void getWindows(const std::string& sequence, MinimizerWindowLength w,
                 const KmerRankTable *rankTable, WindowVector& windowVector);
 
-//------------------------------------------------------------------------------------
 #endif

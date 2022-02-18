@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2020 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -94,5 +94,4 @@ protected:
 
 void swapBytes(void *buffer, int numBytes);
 
-//------------------------------------------------------------------------------------
 #endif

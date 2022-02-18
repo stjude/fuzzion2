@@ -5,25 +5,24 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2020 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "rank.h"
 #include "util.h"
+#include "version.h"
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_ID  = "kmerank v1.0.2, copyright 2021 "
-                                "St. Jude Children's Research Hospital";
+const std::string VERSION_NAME = "kmerank " + CURRENT_VERSION;
 
-const int DEFAULT_KMER_LENGTH = 15;
+const int DEFAULT_KMER_LENGTH  = 15;
+int k = DEFAULT_KMER_LENGTH;         // k-mer length
 
-int k = DEFAULT_KMER_LENGTH;     // k-mer length
-
-std::string refGenFilename = ""; // name of reference genome input file
-std::string binaryFilename = ""; // name of binary output file
-std::string textFilename   = ""; // name of text output file
+std::string refGenFilename     = ""; // name of reference genome input file
+std::string binaryFilename     = ""; // name of binary output file
+std::string textFilename       = ""; // name of text output file
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -31,8 +30,9 @@ std::string textFilename   = ""; // name of text output file
 void showUsage(const char *progname)
 {
    std::cerr
-      << VERSION_ID << NEWLINE << NEWLINE
-      << "Usage: " << progname << " OPTION ..." << NEWLINE;
+      << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
+      << "Usage: " << progname << " OPTION ..."
+      << NEWLINE;
 
    std::cerr
       << NEWLINE

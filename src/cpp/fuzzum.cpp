@@ -5,27 +5,21 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
-#include "util.h"
+#include "hit.h"
+#include "summary.h"
+#include "version.h"
 #include <iostream>
-#include <map>
 #include <stdexcept>
 
-const std::string VERSION_NAME = "fuzzum v1.0.2";
-const std::string COPYRIGHT    =
-   "copyright 2021 St. Jude Children's Research Hospital";
+const std::string VERSION_NAME = FUZZUM + CURRENT_VERSION;
 
-const std::string FUZZION2     = "fuzzion2 ";
-const std::string PATTERN      = "pattern ";
-const std::string READ         = "read ";
-const std::string READ_PAIRS   = "read-pairs ";
+int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
-const int MIN_HEADING_COLS     = 6;
-
-std::string id = ""; // identifies the sample
+std::string id = "";                // identifies the sample
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -42,6 +36,13 @@ void showUsage(const char *progname)
       << "This option is required:" << NEWLINE
       << "  -id=string   "
              << "identifies the sample" << NEWLINE;
+
+   std::cerr
+      << NEWLINE
+      << "The following is optional:" << NEWLINE
+      << "  -strong=N    "
+             << "minimum overlap of a strong match in #bases, default is "
+	     << DEFAULT_MIN_STRONG << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -63,129 +64,54 @@ bool parseArgs(int argc, char *argv[])
       if (splitString(arg, opt, '=') != 2)
          return false; // incorrect option format
 
-      if (stringOpt(opt, "id", id))
+      if (stringOpt(opt, "id",     id) ||
+          intOpt   (opt, "strong", minStrong))
          continue;  // this option has been recognized
 
       return false; // unrecognized option
    }
 
-   return (id != "");
+   return (id != "" && minStrong > 0);
 }
 
 //------------------------------------------------------------------------------------
+// summarizePattern() writes to stdout a summary of the hits in hitVector from begin
+// (inclusive) to end (exclusive); it is assumed that hitVector has been sorted
 
-class Pattern
+void summarizePattern(const HitVector& hitVector, int begin, int end)
 {
-public:
-   Pattern(const std::string& inName, const StringVector& inAnnotation,
-           uint64_t inReadPairs)
-      : name(inName), annotation(inAnnotation), readPairs(inReadPairs) { }
+   std::vector<int> index;
+   getDistinctIndices(hitVector, begin, end, index);
 
-   virtual ~Pattern() { }
+   int numDistinct = index.size();
+   int numStrong   = 0;
 
-   void write() const;
+   for (int i = 0; i < numDistinct; i++)
+      if (hitVector[index[i]]->isStrong(minStrong))
+         numStrong++;
 
-   std::string  name;
-   StringVector annotation;
-   uint64_t readPairs;
-};
+   Summary summary(hitVector[begin]->pattern->name, id, end - begin, numDistinct,
+                   numStrong, hitVector[begin]->pattern->annotation);
 
-typedef std::map<std::string, Pattern> PatternMap; // key is pattern name
-
-//------------------------------------------------------------------------------------
-// readHits() reads the hits from stdin and stores them in the map; annotation
-// headings, if any, are stored in the vector
-
-void readHits(PatternMap& pmap, StringVector& annotationHeading)
-{
-   std::string headingLine, line1, line2, line3;
-   StringVector headingCol;
-
-   if (!getline(std::cin, headingLine))
-      throw std::runtime_error("no input");
-
-   int numCols = splitString(headingLine, headingCol);
-
-   if (numCols < MIN_HEADING_COLS || !hasPrefix(headingCol[0], FUZZION2))
-      throw std::runtime_error("unexpected heading line");
-
-   for (int i = MIN_HEADING_COLS; i < numCols; i++)
-      annotationHeading.push_back(headingCol[i]);
-
-   while (getline(std::cin, line1))
-   {
-      if (hasPrefix(line1, FUZZION2)) // found another heading line
-         if (line1 == headingLine)
-            continue; // ignore it
-         else
-            throw std::runtime_error("inconsistent heading lines");
-
-      if (hasPrefix(line1, READ_PAIRS)) // found total number of read pairs
-         continue; // ignore it
-
-      StringVector col, part;
-
-      if (!hasPrefix(line1, PATTERN) ||
-          splitString(line1, col) != numCols ||
-          splitString(col[0], part, ' ') != 2 || part[1] == "" ||
-          !getline(std::cin, line2) || !hasPrefix(line2, READ) ||
-          !getline(std::cin, line3) || !hasPrefix(line3, READ))
-         throw std::runtime_error("invalid format in: " + line1);
-
-      const std::string& patternName = part[1];
-
-      PatternMap::iterator ppos = pmap.find(patternName);
-
-      if (ppos == pmap.end())
-      {
-         StringVector annotation;
-
-	 for (int i = MIN_HEADING_COLS; i < numCols; i++)
-            annotation.push_back(col[i]);
-
-	 pmap.insert(std::make_pair(patternName,
-                                    Pattern(patternName, annotation, 1)));
-      }
-      else
-      {
-         Pattern& pattern = ppos->second;
-	 pattern.readPairs++;
-      }
-   }
+   summary.write();
 }
 
 //------------------------------------------------------------------------------------
-// writeHeadingLine() writes a heading line to stdout
+// writeSummaries() writes summaries to stdout for the hits in hitVector
 
-void writeHeadingLine(const StringVector& annotationHeading)
+void writeSummaries(const StringVector& annotationHeading,
+                    const HitVector& hitVector)
 {
-   std::cout << VERSION_NAME
-             << TAB << "read pairs"
-	     << TAB << "pattern";
+   writeSummaryHeadingLine(CURRENT_VERSION, annotationHeading);
 
-   int numAnnotations = annotationHeading.size();
+   std::vector<int> index;
+   getPatternIndices(hitVector, index);
 
-   for (int i = 0; i < numAnnotations; i++)
-      std::cout << TAB << annotationHeading[i];
+   int numPatterns = index.size();
 
-   std::cout << NEWLINE;
-}
-
-//------------------------------------------------------------------------------------
-// Pattern::write() writes information about a pattern to stdout
-
-void Pattern::write() const
-{
-   std::cout << id
-             << TAB << readPairs
-	     << TAB << name;
-
-   int numAnnotations = annotation.size();
-
-   for (int i = 0; i < numAnnotations; i++)
-      std::cout << TAB << annotation[i];
-
-   std::cout << NEWLINE;
+   for (int i = 0; i < numPatterns; i++)
+      summarizePattern(hitVector, index[i],
+                       (i + 1 < numPatterns ? index[i + 1] : hitVector.size()));
 }
 
 //------------------------------------------------------------------------------------
@@ -200,18 +126,13 @@ int main(int argc, char *argv[])
 
    try
    {
-      PatternMap   pmap;
+      std::string  fuzzion2Version;
       StringVector annotationHeading;
+      HitVector    hitVector;
 
-      readHits(pmap, annotationHeading);
+      readHits(fuzzion2Version, annotationHeading, hitVector);
 
-      writeHeadingLine(annotationHeading);
-
-      for (PatternMap::iterator ppos = pmap.begin(); ppos != pmap.end(); ++ppos)
-      {
-         const Pattern& pattern = ppos->second;
-	 pattern.write();
-      }
+      writeSummaries(annotationHeading, hitVector);
    }
    catch (const std::runtime_error& error)
    {

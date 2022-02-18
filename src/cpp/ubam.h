@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -13,29 +13,30 @@
 
 #include "bamread.h"
 #include "pairread.h"
-#include "util.h"
 
 //------------------------------------------------------------------------------------
 
 class UbamPairReader : public PairReader
 {
 public:
-   UbamPairReader()
-      : reader(), filename(), currentFile(-1) { }
+   UbamPairReader(const std::string& inFilename)
+      : filename(inFilename), reader() { }
 
    virtual ~UbamPairReader() { }
 
-   void open(const StringVector& inFilename);
+   void open()  { reader.open(filename); }
 
    bool getNextPair(std::string& name1, std::string& sequence1,
                     std::string& name2, std::string& sequence2);
 
    void close() { reader.close(); }
 
-   BamReader    reader;
-   StringVector filename;
-   int          currentFile; // index into filename of file currently being read
+   std::string filename;
+   BamReader  reader;
 };
 
 //------------------------------------------------------------------------------------
+
+bool isUbamFile(const std::string& filename);
+
 #endif

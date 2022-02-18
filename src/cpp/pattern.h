@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -28,9 +28,14 @@ public:
    std::string name;            // pattern name
    std::string sequence;        // sequence w/o brackets or braces
    std::string displaySequence; // sequence w/  brackets or braces
-   int  leftBases;              // #bases in left  side of sequence
+
+   bool hasBraces;              // false = brackets: left]mid[right
+                                // true  = braces  : left}mid{right
+   int  delim2;                 // offset of second delimiter: [ or {
+   int  leftBases;              // #bases in left side of sequence
+   int  middleBases;            // #bases between delimiters
    int  rightBases;             // #bases in right side of sequence
-   bool hasBraces;              // true = braces, false = brackets
+
    StringVector annotation;     // zero or more annotations
 };
 
@@ -57,6 +62,9 @@ typedef std::unordered_map<Minimizer, LocationVector> PatternMap;
 
 //------------------------------------------------------------------------------------
 
+bool hasDelimiters(const std::string& sequence, bool& hasBraces, int& delim2,
+                   int& leftBases, int& middleBases, int& rightBases);
+
 PatternVector *readPatterns(const std::string& filename,
                             StringVector& annotationHeading);
 
@@ -64,5 +72,4 @@ PatternMap *createPatternMap(const PatternVector *patternVector,
                              MinimizerWindowLength w, const KmerRankTable *rankTable,
 			     Minimizer maxMinimizer);
 
-//------------------------------------------------------------------------------------
 #endif

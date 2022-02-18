@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -19,19 +19,20 @@
 class FastqReader // for reading a single FASTQ file
 {
 public:
-   FastqReader()
-      : f(NULL), isPipe(false) { }
+   FastqReader(const std::string& inFilename)
+      : filename(inFilename), f(NULL), isPipe(false) { }
 
    virtual ~FastqReader() { }
 
-   void open(const std::string& filename);
+   void open();
 
    bool getNext(std::string& name, std::string& sequence);
 
    void close();
 
-   std::FILE *f;        // is non-NULL when the file is open
-   bool       isPipe;   // is true when reading from a pipe
+   std::string  filename; // name of file to read
+   std::FILE   *f;        // is non-NULL when the file is open
+   bool         isPipe;   // is true when reading from a pipe
 };
 
 //------------------------------------------------------------------------------------
@@ -39,13 +40,12 @@ public:
 class FastqPairReader : public PairReader
 {
 public:
-   FastqPairReader()
-      : reader1(), reader2() { }
+   FastqPairReader(const std::string& filename1, const std::string& filename2)
+      : reader1(filename1), reader2(filename2) { }
 
    virtual ~FastqPairReader() { }
 
-   void open(const std::string& filename1, const std::string& filename2)
-   { reader1.open(filename1); reader2.open(filename2); }
+   void open()  { reader1.open(); reader2.open(); }
 
    bool getNextPair(std::string& name1, std::string& sequence1,
                     std::string& name2, std::string& sequence2);
@@ -60,12 +60,12 @@ public:
 class InterleavedFastqPairReader : public PairReader
 {
 public:
-   InterleavedFastqPairReader()
-      : reader() { }
+   InterleavedFastqPairReader(const std::string& filename)
+      : reader(filename) { }
 
    virtual ~InterleavedFastqPairReader() { }
 
-   void open(const std::string& filename) { reader.open(filename); }
+   void open()  { reader.open(); }
 
    bool getNextPair(std::string& name1, std::string& sequence1,
                     std::string& name2, std::string& sequence2);
@@ -76,4 +76,8 @@ public:
 };
 
 //------------------------------------------------------------------------------------
+
+bool isFastqFile(const std::string& filename, std::string& name1, std::string& name2,
+                 bool& interleaved);
+
 #endif

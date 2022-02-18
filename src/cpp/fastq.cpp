@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -12,10 +12,10 @@
 #include <stdexcept>
 
 //------------------------------------------------------------------------------------
-// FastqReader::open() opens the named file for input; if the filename ends with
-// ".gz", the file is assumed to be gzipped and it is uncompressed
+// FastqReader::open() opens a file for input; if the filename ends with ".gz", the
+// file is assumed to be gzipped and it is uncompressed
 
-void FastqReader::open(const std::string& filename)
+void FastqReader::open()
 {
    if (f)
       throw std::runtime_error("FASTQ file already open");
@@ -46,7 +46,8 @@ void FastqReader::open(const std::string& filename)
 bool FastqReader::getNext(std::string& name, std::string& sequence)
 {
    if (!f)
-      throw std::runtime_error("attempt to read from unopened FASTQ file");
+      throw std::runtime_error("attempt to read from unopened FASTQ file " +
+                               filename);
 
    const int MAX_LINE_LEN = 100000;
    typedef char Line[MAX_LINE_LEN];
@@ -60,7 +61,7 @@ bool FastqReader::getNext(std::string& name, std::string& sequence)
        !std::fgets(plusLine, MAX_LINE_LEN, f) ||
        !std::fgets(qualLine, MAX_LINE_LEN, f) ||
        nameLine[0] != '@' || plusLine[0] != '+')
-      throw std::runtime_error("unexpected format in FASTQ file");
+      throw std::runtime_error("unexpected format in FASTQ file " + filename);
 
    int i = 1;
    while (nameLine[i] && !isspace(nameLine[i]))
@@ -114,9 +115,12 @@ bool FastqPairReader::getNextPair(std::string& name1, std::string& sequence1,
       if (namesMatch(name1, name2))
          return true;
       else
-         throw std::runtime_error("mismatched read names " + name1 + " and " + name2);
+         throw std::runtime_error("mismatched read names " + name1 + " and " + name2 +
+                                  " in "  + reader1.filename +
+				  " and " + reader2.filename);
    else
-      throw std::runtime_error("mismatched number of reads");
+      throw std::runtime_error("different number of reads in " + reader1.filename +
+			       " and " + reader2.filename);
 }
 
 //------------------------------------------------------------------------------------
@@ -131,10 +135,53 @@ bool InterleavedFastqPairReader::getNextPair(
       return false; // reached EOF
 
    if (!reader.getNext(name2, sequence2))
-      throw std::runtime_error("mismatched number of reads");
+      throw std::runtime_error("odd number of reads in " + reader.filename);
 
    if (namesMatch(name1, name2))
       return true;
    else
-      throw std::runtime_error("mismatched read names " + name1 + " and " + name2);
+      throw std::runtime_error("mismatched read names " + name1 + " and " + name2 +
+                               " in " + reader.filename);
+}
+
+//------------------------------------------------------------------------------------
+// isFastqFile() returns true if the named file is a FASTQ file; if so, the names of
+// the first two reads in the file are obtained and interleaved is set to true if
+// these read names match one another
+
+bool isFastqFile(const std::string& filename, std::string& name1, std::string& name2,
+                 bool& interleaved)
+{
+   FastqReader reader(filename);
+
+   try
+   {
+      reader.open();
+   }
+   catch (const std::runtime_error& error) { return false; }
+
+   bool isFastq = false;
+
+   try
+   {
+      std::string sequence1, sequence2;
+
+      if (reader.getNext(name1, sequence1))
+      {
+         if (reader.getNext(name2, sequence2))
+            interleaved = namesMatch(name1, name2);
+	 else
+	 {
+            name2 = "_NONE_"; // only one read in the file
+	    interleaved = false;
+	 }
+
+	 isFastq = true;
+      }
+   }
+   catch (const std::runtime_error& error) { }
+
+   reader.close();
+
+   return isFastq;
 }

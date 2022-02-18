@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2021 St. Jude Children's Research Hospital
+// Copyright 2022 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -29,34 +29,49 @@ Pattern::Pattern(const std::string& inName, const std::string& inSequence,
    if (name.find(' ') != std::string::npos)
       throw std::runtime_error("space not allowed in pattern name \"" + name + "\"");
 
-   bool foundDelimiters = false;
-   int  delim1, delim2;
+   if (!hasDelimiters(displaySequence, hasBraces, delim2, leftBases, middleBases,
+                      rightBases))
+      throw std::runtime_error("invalid pattern " + displaySequence);
 
-   if ((delim1 = inSequence.find(']')) != std::string::npos &&
-       (delim2 = inSequence.find('[')) != std::string::npos)
+   sequence = displaySequence.substr(0, leftBases) +
+              displaySequence.substr(leftBases + 1, middleBases) +
+              displaySequence.substr(delim2 + 1, rightBases);
+}
+
+//------------------------------------------------------------------------------------
+// hasDelimiters() looks for delimiters (brackets or braces) in the given sequence and
+// returns true if valid delimiters are found: left]mid[right or left}mid{right;
+// delim2 gets the offset of the second delimiter, either [ or {
+
+bool hasDelimiters(const std::string& sequence, bool& hasBraces, int& delim2,
+                   int& leftBases, int& middleBases, int& rightBases)
+{
+   bool foundDelimiters = false;
+   int  delim1;
+
+   if ((delim1 = sequence.find(']')) != std::string::npos &&
+       (delim2 = sequence.find('[')) != std::string::npos)
    {
       foundDelimiters = true;
       hasBraces       = false;
    }
-   else if ((delim1 = inSequence.find('}')) != std::string::npos &&
-            (delim2 = inSequence.find('{')) != std::string::npos)
+   else if ((delim1 = sequence.find('}')) != std::string::npos &&
+            (delim2 = sequence.find('{')) != std::string::npos)
    {
       foundDelimiters = true;
       hasBraces       = true;
    }
 
-   if (!foundDelimiters || delim1 == 0 || delim2 == inSequence.length() - 1 ||
-       delim1 > delim2)
-      throw std::runtime_error("invalid pattern " + inSequence);
+   int seqlen = sequence.length();
 
-   int middleBases = delim2 - delim1 - 1;
+   if (!foundDelimiters || delim1 == 0 || delim2 == seqlen - 1 || delim1 > delim2)
+      return false;
 
-   leftBases  = delim1;
-   rightBases = inSequence.length() - 1 - delim2;
+   leftBases   = delim1;
+   middleBases = delim2 - delim1 - 1;
+   rightBases  = seqlen - 1 - delim2;
 
-   sequence   = inSequence.substr(0, leftBases) +
-                inSequence.substr(delim1 + 1, middleBases) +
-		inSequence.substr(delim2 + 1, rightBases);
+   return true;
 }
 
 //------------------------------------------------------------------------------------

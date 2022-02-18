@@ -8,7 +8,7 @@ OBJ_PREFIX=$(BUILD_PREFIX)/obj
 
 FUZZION2_NAME=fuzzion2
 FUZZION2_BIN=$(BIN_PREFIX)/$(FUZZION2_NAME)
-FUZZION2_SRC_BASENAMES=fuzzion2.cpp bamread.cpp bin.cpp fastq.cpp kmer.cpp \
+FUZZION2_SRC_BASENAMES=fuzzion2.cpp bamread.cpp bin.cpp fastq.cpp hit.cpp kmer.cpp \
 	match.cpp minimizer.cpp pairread.cpp pattern.cpp rank.cpp refgen.cpp \
         ubam.cpp util.cpp window.cpp
 FUZZION2_SRCS=$(FUZZION2_SRC_BASENAMES:%.cpp=$(SRC_PREFIX)/%.cpp)
@@ -17,25 +17,28 @@ FUZZION2_LDLIBS=-lhts -lpthread
 
 FUZZALL_NAME=fuzzall
 FUZZALL_BIN=$(BIN_PREFIX)/$(FUZZALL_NAME)
-FUZZALL_SRC_BASENAMES=fuzzall.cpp util.cpp
+FUZZALL_SRC_BASENAMES=fuzzall.cpp summary.cpp util.cpp
 FUZZALL_SRCS=$(FUZZALL_SRC_BASENAMES:%.cpp=$(SRC_PREFIX)/%.cpp)
 FUZZALL_OBJS=$(FUZZALL_SRC_BASENAMES:%.cpp=$(OBJ_PREFIX)/%.o)
 
 FUZZION2HTML_NAME=fuzzion2html
 FUZZION2HTML_BIN=$(BIN_PREFIX)/$(FUZZION2HTML_NAME)
-FUZZION2HTML_SRC_BASENAMES=fuzzion2html.cpp util.cpp
+FUZZION2HTML_SRC_BASENAMES=fuzzion2html.cpp hit.cpp kmer.cpp minimizer.cpp \
+	pattern.cpp util.cpp window.cpp
 FUZZION2HTML_SRCS=$(FUZZION2HTML_SRC_BASENAMES:%.cpp=$(SRC_PREFIX)/%.cpp)
 FUZZION2HTML_OBJS=$(FUZZION2HTML_SRC_BASENAMES:%.cpp=$(OBJ_PREFIX)/%.o)
 
 FUZZORT_NAME=fuzzort
 FUZZORT_BIN=$(BIN_PREFIX)/$(FUZZORT_NAME)
-FUZZORT_SRC_BASENAMES=fuzzort.cpp util.cpp
+FUZZORT_SRC_BASENAMES=fuzzort.cpp hit.cpp kmer.cpp minimizer.cpp \
+	pattern.cpp util.cpp window.cpp
 FUZZORT_SRCS=$(FUZZORT_SRC_BASENAMES:%.cpp=$(SRC_PREFIX)/%.cpp)
 FUZZORT_OBJS=$(FUZZORT_SRC_BASENAMES:%.cpp=$(OBJ_PREFIX)/%.o)
 
 FUZZUM_NAME=fuzzum
 FUZZUM_BIN=$(BIN_PREFIX)/$(FUZZUM_NAME)
-FUZZUM_SRC_BASENAMES=fuzzum.cpp util.cpp
+FUZZUM_SRC_BASENAMES=fuzzum.cpp hit.cpp kmer.cpp minimizer.cpp \
+	pattern.cpp summary.cpp util.cpp window.cpp
 FUZZUM_SRCS=$(FUZZUM_SRC_BASENAMES:%.cpp=$(SRC_PREFIX)/%.cpp)
 FUZZUM_OBJS=$(FUZZUM_SRC_BASENAMES:%.cpp=$(OBJ_PREFIX)/%.o)
 
