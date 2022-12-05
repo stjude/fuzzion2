@@ -130,7 +130,9 @@ KmerFinder::KmerFinder(const char *sequence, int sequenceLen, KmerLength kmerLen
 //------------------------------------------------------------------------------------
 // KmerFinder::find() searches for k-mers in the sequence; each k-mer that is found is
 // reported along with its starting index in the sequence; the search terminates when
-// the sequence has been exhausted or when report() returns false
+// the sequence has been exhausted or when report() returns false; this function
+// consumes a large fraction of the running time of fuzzion2 and so an effort has been
+// made to optimize it
 
 void KmerFinder::find()
 {
@@ -138,27 +140,71 @@ void KmerFinder::find()
    KmerLength len = 0; // length of the k-mer under construction
 
    for (int i = 0; i < seqlen; i++)
-   {
-      Base base = charToBase(seq[i]);
-
-      if (base < NUM_BASES)
+      switch (seq[i])
       {
-         if (len < k)
-	 {
-            len++;
-	    kmer |= base << 2 * (k - len);
-	 }
-	 else // len == k
-            kmer = ((kmer << 2) & mask) | base;
+         case 'A': case 'a':
+            if (len == k)
+	    {
+               if (!reportKmer(kmer = (kmer << 2) & mask, i - k + 1))
+                  return;
+	    }
+	    else if (++len == k)
+	    {
+               if (!reportKmer(kmer, i - k + 1))
+                  return;
+	    }
+	    break;
 
-	 if (len == k && !reportKmer(kmer, i - k + 1))
-            break;
+	 case 'C': case 'c':
+            if (len == k)
+	    {
+               if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_C, i - k + 1))
+                  return;
+	    }
+	    else if (++len == k)
+	    {
+               if (!reportKmer(kmer |= BASE_C, i - k + 1))
+                  return;
+	    }
+	    else
+               kmer |= BASE_C << ((k - len) << 1);
+	    break;
+
+	 case 'G': case 'g':
+            if (len == k)
+	    {
+               if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_G, i - k + 1))
+                  return;
+	    }
+	    else if (++len == k)
+	    {
+               if (!reportKmer(kmer |= BASE_G, i - k + 1))
+                  return;
+	    }
+	    else
+               kmer |= BASE_G << ((k - len) << 1);
+	    break;
+
+	 case 'T': case 't':
+            if (len == k)
+	    {
+               if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_T, i - k + 1))
+                  return;
+	    }
+	    else if (++len == k)
+	    {
+               if (!reportKmer(kmer |= BASE_T, i - k + 1))
+                  return;
+	    }
+	    else
+               kmer |= BASE_T << ((k - len) << 1);
+	    break;
+
+	 default: // some other base, such as 'N'
+            if (len > 0)
+	    {
+               kmer = 0;
+	       len  = 0;
+	    }
       }
-      else // encountered an unrecognized base such as 'N'
-         if (len > 0)
-	 {
-            kmer = 0;
-	    len  = 0;
-	 }
-   }
 }

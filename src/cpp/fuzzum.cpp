@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
       StringVector annotationHeading;
       HitVector    hitVector;
 
-      readHits(fuzzion2Version, annotationHeading, hitVector);
+      readHits(std::cin, fuzzion2Version, annotationHeading, hitVector);
 
       writeSummaries(annotationHeading, hitVector);
    }
