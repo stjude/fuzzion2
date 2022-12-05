@@ -1,3 +1,3 @@
-fuzzum v1.1.0	read pairs	distinct	strong	pattern
+fuzzum v1.1.1	read pairs	distinct	strong	pattern
 example	2	2	2	BCR-ABL1
 example	1	1	1	IKZF1-IKZF1

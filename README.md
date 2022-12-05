@@ -72,15 +72,15 @@ Specify -fastq1 and -fastq2, or -ifastq or -ubam, or list filenames on command l
 The following are optional:
    N is a numeric value, e.g., -threads=4
   -maxins=N     maximum insert size in bases. . . . . . . . . . . . default 500
-  -maxrank=N    maximum rank percentile of minimizers . . . . . . . default 95.0
+  -maxrank=N    maximum rank percentile of minimizers . . . . . . . default 99.9
   -maxtrim=N    maximum bases second read aligned ahead of first. . default 5
   -minbases=N   minimum percentile of matching bases. . . . . . . . default 90.0
-  -minmins=N    minimum number of matching minimizers . . . . . . . default 3
+  -minmins=N    minimum number of matching minimizers . . . . . . . default 1
   -minov=N      minimum overlap in number of bases. . . . . . . . . default 5
   -show=N       show best only (1) or all patterns (0) that match . default 1
   -single=N     show single-read (1) or just read-pair (0) matches. default 0
   -threads=N    number of threads . . . . . . . . . . . . . . . . . default 8
-  -w=N          window length in number of bases. . . . . . . . . . default 5
+  -w=N          window length in number of bases. . . . . . . . . . default 10
 ```
 
 The `-pattern` option is required and specifies the name of a text file containing
@@ -139,9 +139,9 @@ to patterns.
 
 If there are patterns consisting of very common k-mers, some matches may be missed.
 In this case, the value of the `-maxrank` option should be increased.  By default, this
-option is set to 95.0, which means the 5% most common k-mers in the reference genome are
+option is set to 99.9, which means the 0.1% most common k-mers in the reference genome are
 ignored.  Increasing the value to 100.0 processes all k-mers, but the program may run
-very slowly.
+slowly.
 
 The `-w` option specifies the window length; reducing this value increases the number
 of minimizers representing each sequence.  The `-minmins` option specifies the minimum
@@ -196,7 +196,10 @@ This option is required:
 The following is optional:
   -strong=N    minimum overlap of a strong match in #bases, default is 15
 
-Usage: fuzzall fuzzum_filename ... > pattern_summary
+Usage: fuzzall OPTION fuzzum_filename ... > pattern_summary
+
+The following is optional:
+  -dataset=name   name associated with this dataset
 ```
 
 These summaries indicate the number of distinct read pairs matching each pattern,
