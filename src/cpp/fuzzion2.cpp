@@ -23,16 +23,16 @@ const std::string VERSION_NAME   = FUZZION2 + CURRENT_VERSION;
 
 const int    THREAD_BATCH_SIZE   = 100000; // number of read pairs in a full batch
 
-const double DEFAULT_MAX_RANK    = 95;  // default max rank percentile of minimizers
-const double DEFAULT_MIN_BASES   = 90;  // default min percentile of matching bases
-const int    DEFAULT_MAX_INSERT  = 500; // default max insert size in bases
-const int    DEFAULT_MAX_TRIM    = 5;   // default max bases, second ahead of first
-const int    DEFAULT_MIN_MINS    = 3;   // default min number of matching minimizers
-const int    DEFAULT_MIN_OVERLAP = 5;   // default min length of overlap in #bases
-const int    DEFAULT_SHOW        = 1;   // default setting of -show option
-const int    DEFAULT_SINGLE      = 0;   // default setting of -single option
-const int    DEFAULT_THREADS     = 8;   // default number of threads
-const int    DEFAULT_WINDOW_LEN  = 5;   // default length of windows in #bases
+const double DEFAULT_MAX_RANK    = 99.9; // default max rank percentile of minimizers
+const double DEFAULT_MIN_BASES   = 90.0; // default min percentile of matching bases
+const int    DEFAULT_MAX_INSERT  = 500;  // default max insert size in bases
+const int    DEFAULT_MAX_TRIM    = 5;    // default max bases, second ahead of first
+const int    DEFAULT_MIN_MINS    = 1;    // default min number of matching minimizers
+const int    DEFAULT_MIN_OVERLAP = 5;    // default min length of overlap in #bases
+const int    DEFAULT_SHOW        = 1;    // default setting of -show option
+const int    DEFAULT_SINGLE      = 0;    // default setting of -single option
+const int    DEFAULT_THREADS     = 8;    // default number of threads
+const int    DEFAULT_WINDOW_LEN  = 10;   // default length of windows in #bases
 
 double maxRank    = DEFAULT_MAX_RANK;
 double minBases   = DEFAULT_MIN_BASES;

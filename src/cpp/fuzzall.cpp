@@ -17,6 +17,7 @@
 
 const std::string VERSION_NAME = "fuzzall " + CURRENT_VERSION;
 
+std::string  datasetName = "";
 StringVector fuzzumFilename;
 
 //------------------------------------------------------------------------------------
@@ -26,8 +27,13 @@ void showUsage(const char *progname)
 {
    std::cerr
       << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
-      << "Usage: " << progname << " fuzzum_filename ... > pattern_summary"
+      << "Usage: " << progname << " OPTION fuzzum_filename ... > pattern_summary"
       << NEWLINE;
+
+   std::cerr
+      << NEWLINE
+      << "The following is optional:" << NEWLINE
+      << "  -dataset=name   name associated with this dataset" << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -46,6 +52,14 @@ bool parseArgs(int argc, char *argv[])
          fuzzumFilename.push_back(arg);
 	 continue;
       }
+
+      StringVector opt;
+
+      if (splitString(arg, opt, '=') != 2)
+         return false; // incorrect option format
+
+      if (stringOpt(opt, "dataset", datasetName))
+         continue;  // this option has been recognized
 
       return false; // unrecognized option
    }
@@ -142,6 +156,9 @@ void writeHeadingLine(const StringVector& annotationHeading)
 {
    std::cout << VERSION_NAME;
 
+   if (datasetName != "")
+      std::cout << TAB << "dataset";
+
    for (int i = 0; i < 2; i++)
       std::cout << TAB << (i == 0 ? "distinct" : "strong")
                 << TAB << "min"
@@ -170,6 +187,9 @@ void writePatternLine(const std::string& patternName,
 		      const StringVector& annotation)
 {
    std::cout << patternName;
+
+   if (datasetName != "")
+      std::cout << TAB << datasetName;
 
    distinctStats.write();
    strongStats.write();

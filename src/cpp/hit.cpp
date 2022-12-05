@@ -75,9 +75,8 @@ void HitRead::write() const
 bool Hit::sameAs(const Hit& other) const
 {
    return (pattern->name == other.pattern->name &&
-           pattern->leftBases == other.pattern->leftBases &&
-	   read1->sequence == other.read1->sequence &&
-	   read2->sequence == other.read2->sequence);
+           pattern->leftBases  == other.pattern->leftBases &&
+	   pattern->rightBases == other.pattern->rightBases);
 }
 
 //------------------------------------------------------------------------------------
@@ -257,7 +256,7 @@ static bool isValidReadLine(const std::string& line, std::string& name,
 // the given line (the pattern) and the next two lines (the read pair), or returns
 // NULL if the input is invalid
 
-static Hit *getHit(const std::string& line)
+static Hit *getHit(std::istream& istream, const std::string& line)
 {
    std::string name, sequence, readLine;
    StringVector annotation;
@@ -273,7 +272,7 @@ static Hit *getHit(const std::string& line)
    HitRead *read[2];
 
    for (int i = 0; i < 2; i++)
-      if (getline(std::cin, readLine) &&
+      if (getline(istream, readLine) &&
           isValidReadLine(readLine, name, leadingBlanks, sequence, matchingBases))
          read[i] = new HitRead(name, leadingBlanks, sequence, matchingBases);
       else
@@ -296,8 +295,7 @@ struct HitCompare
    {
       // sort by ascending pattern name,
       // then by ascending number of left bases,
-      // then by ascending read1 sequence,
-      // then by ascending read2 sequence,
+      // then by ascending number of right bases,
       // then by ascending read1 name
 
       int key1 = std::strcmp(a->pattern->name.c_str(), b->pattern->name.c_str());
@@ -308,13 +306,9 @@ struct HitCompare
       if (key2 != 0)
          return (key2 < 0);
 
-      int key3 = std::strcmp(a->read1->sequence.c_str(), b->read1->sequence.c_str());
+      int key3 = a->pattern->rightBases - b->pattern->rightBases;
       if (key3 != 0)
          return (key3 < 0);
-
-      int key4 = std::strcmp(a->read2->sequence.c_str(), b->read2->sequence.c_str());
-      if (key4 != 0)
-         return (key4 < 0);
 
       return (a->read1->name < b->read1->name);
    }
@@ -329,22 +323,22 @@ static void sortHits(HitVector& hitVector)
 }
 
 //------------------------------------------------------------------------------------
-// readHits() reads hits from stdin and stores them in sorted order in hitVector; the
-// return value is the total number of read pairs processed by fuzzion2
+// readHits() reads hits and stores them in sorted order in hitVector; the return
+// value is the total number of read pairs processed by fuzzion2
 
-uint64_t readHits(std::string& version, StringVector& annotationHeading,
-                  HitVector& hitVector)
+uint64_t readHits(std::istream& istream, std::string& version,
+                  StringVector& annotationHeading, HitVector& hitVector)
 {
    uint64_t totalReadPairs = 0;
    std::string headingLine, line;
 
-   if (!getline(std::cin, headingLine))
+   if (!getline(istream, headingLine))
       throw std::runtime_error("no input");
 
    if (!isValidHeadingLine(headingLine, version, annotationHeading))
       throw std::runtime_error("unexpected heading line");
 
-   while (getline(std::cin, line))
+   while (getline(istream, line))
       if (isHeadingLine(line)) // found another heading line
       {
          if (line != headingLine)
@@ -361,7 +355,7 @@ uint64_t readHits(std::string& version, StringVector& annotationHeading,
       }
       else
       {
-         Hit *hit = getHit(line);
+         Hit *hit = getHit(istream, line);
 
 	 if (hit)
             if (hitVector.size() < MAX_HITS)

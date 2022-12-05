@@ -12,6 +12,7 @@
 #define HIT_H
 
 #include "pattern.h"
+#include <istream>
 #include <limits>
 
 const std::string FUZZION2 = "fuzzion2 ";
@@ -98,8 +99,8 @@ void writeHitHeadingLine(const std::string& version,
 
 void writeReadPairLine(uint64_t numReadPairs);
 
-uint64_t readHits(std::string& version, StringVector& annotationHeading,
-                  HitVector& hitVector);
+uint64_t readHits(std::istream& istream, std::string& version,
+		  StringVector& annotationHeading, HitVector& hitVector);
 
 void getPatternIndices(const HitVector& hitVector, std::vector<int>& index);
 

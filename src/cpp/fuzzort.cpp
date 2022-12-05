@@ -43,7 +43,8 @@ int main(int argc, char *argv[])
       StringVector annotationHeading;
       HitVector hitVector;
 
-      uint64_t numReadPairs = readHits(fuzzion2Version, annotationHeading, hitVector);
+      uint64_t numReadPairs = readHits(std::cin, fuzzion2Version, annotationHeading,
+                                       hitVector);
 
       writeHitHeadingLine(fuzzion2Version, annotationHeading);
 
