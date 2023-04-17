@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -24,15 +24,15 @@ const std::string SEQUENCE   = "sequence";
 const std::string MBASES     = "matching bases";
 const std::string POSSIBLE   = "possible";
 const std::string PERCENT    = "% match";
+const std::string SPANNING   = "junction spanning";
 const std::string ISIZE      = "insert size";
 
 const int SEQUENCE_COL       = 1;
 const int MBASES_COL         = 2;
 const int POSSIBLE_COL       = 3;
 const int PERCENT_COL        = 4;
-const int ISIZE_COL          = 5;
-const int MIN_HEADING_COLS   = 6;
-const int READ_COLS          = 5;
+const int SPANNING_COL       = 5;
+const int ISIZE_COL          = 5; // add one if spanning column is present
 
 //------------------------------------------------------------------------------------
 // HitPattern::write() writes one line to stdout describing the pattern matched by a
@@ -45,6 +45,7 @@ void HitPattern::write() const
 	     << TAB << matchingBases
 	     << TAB << possible
 	     << TAB << doubleToString(percentMatch())
+	     << TAB << spanningCount
 	     << TAB << insertSize;
 
    int numAnnotations = annotation.size();
@@ -66,6 +67,7 @@ void HitRead::write() const
 	     << TAB << matchingBases
 	     << TAB << possible()
 	     << TAB << doubleToString(percentMatch())
+	     << TAB << (isSpanning ? 1 : 0)
 	     << NEWLINE;
 }
 
@@ -80,6 +82,23 @@ bool Hit::sameAs(const Hit& other) const
 }
 
 //------------------------------------------------------------------------------------
+// Hit::label() returns the hit category
+
+std::string Hit::label(int minStrong) const
+{
+   if (duplicate)
+      return HIT_DUPLICATE;
+
+   if (isStrong(minStrong))
+      if (isSpanning())
+         return HIT_STRONG_SPAN;
+      else
+         return HIT_STRONG_NOSPAN;
+
+   return HIT_WEAK;
+}
+
+//------------------------------------------------------------------------------------
 // writeHitHeadingLine() writes a heading line to stdout
 
 void writeHitHeadingLine(const std::string& version,
@@ -90,6 +109,7 @@ void writeHitHeadingLine(const std::string& version,
 	     << TAB << MBASES
 	     << TAB << POSSIBLE
 	     << TAB << PERCENT
+	     << TAB << SPANNING
 	     << TAB << ISIZE;
 
    int numAnnotations = annotationHeading.size();
@@ -111,16 +131,21 @@ static bool isHeadingLine(const std::string& line)
 //------------------------------------------------------------------------------------
 // isValidHeadingLine() returns true if the given line is a valid heading line
 
-static bool isValidHeadingLine(const std::string& line, std::string& version,
-                               StringVector& annotationHeading)
+static bool isValidHeadingLine(const std::string& line, bool& hasSpanningCol,
+                               std::string& version, StringVector& annotationHeading)
 {
    StringVector col;
    int numCols = splitString(line, col);
 
-   if (!isHeadingLine(line) || numCols < MIN_HEADING_COLS ||
+   if (!isHeadingLine(line) || numCols <= PERCENT_COL ||
        col[SEQUENCE_COL] != SEQUENCE || col[MBASES_COL]  != MBASES ||
-       col[POSSIBLE_COL] != POSSIBLE || col[PERCENT_COL] != PERCENT ||
-       col[ISIZE_COL]    != ISIZE)
+       col[POSSIBLE_COL] != POSSIBLE || col[PERCENT_COL] != PERCENT)
+      return false;
+
+   hasSpanningCol = (numCols > SPANNING_COL && col[SPANNING_COL] == SPANNING);
+   int isizeCol   = (hasSpanningCol ? ISIZE_COL + 1 : ISIZE_COL);
+
+   if (numCols <= isizeCol || col[isizeCol] != ISIZE)
       return false;
 
    StringVector versionCol;
@@ -131,7 +156,7 @@ static bool isValidHeadingLine(const std::string& line, std::string& version,
 
    annotationHeading.clear();
 
-   for (int i = MIN_HEADING_COLS; i < numCols; i++)
+   for (int i = isizeCol + 1; i < numCols; i++)
       annotationHeading.push_back(col[i]);
 
    return true;
@@ -184,38 +209,41 @@ static bool isPatternLine(const std::string& line)
 }
 
 //------------------------------------------------------------------------------------
-// isValidPatternLine() returns true if the given line correctly describes a pattern
-// that was matched
+// getPattern() returns a pointer to a newly-allocated HitPattern describing the
+// pattern identified by the given line, or returns NULL if the input is invalid
 
-static bool isValidPatternLine(const std::string& line, std::string& name,
-                               std::string& sequence, StringVector& annotation,
-			       int& matchingBases, int& possible, int& insertSize)
+static HitPattern *getPattern(const std::string& line, bool hasSpanningCol)
 {
-   if (!isPatternLine(line))
-      return false;
-
    StringVector col;
-   int numCols = splitString(line, col);
+   int numCols  = splitString(line, col);
 
-   if (numCols < MIN_HEADING_COLS ||
-       (matchingBases = stringToNonnegInt(col[MBASES_COL]))   <= 0 ||
-       (possible      = stringToNonnegInt(col[POSSIBLE_COL])) <= 0 ||
-       (insertSize    = stringToNonnegInt(col[ISIZE_COL]))    <= 0)
-      return false;
+   int isizeCol = (hasSpanningCol ? ISIZE_COL + 1 : ISIZE_COL);
+
+   int matchingBases, possible, spanningCount = 0, insertSize;
+
+   if (!isPatternLine(line) || numCols <= isizeCol ||
+       (matchingBases  = stringToNonnegInt(col[MBASES_COL]))   <= 0 ||
+       (possible       = stringToNonnegInt(col[POSSIBLE_COL])) <= 0 ||
+       hasSpanningCol &&
+       ((spanningCount = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
+	spanningCount > 2) ||
+       (insertSize     = stringToNonnegInt(col[isizeCol]))     <= 0)
+      return NULL;
 
    StringVector patternCol;
    if (splitString(col[0], patternCol, ' ') != 2 || patternCol[1] == "")
-      return false;
+      return NULL;
 
-   name     = patternCol[1];
-   sequence = col[SEQUENCE_COL];
+   const std::string& name     = patternCol[1];
+   const std::string& sequence = col[SEQUENCE_COL];
 
-   annotation.clear();
+   StringVector annotation;
 
-   for (int i = MIN_HEADING_COLS; i < numCols; i++)
+   for (int i = isizeCol + 1; i < numCols; i++)
       annotation.push_back(col[i]);
 
-   return true;
+   return new HitPattern(name, sequence, annotation, matchingBases, possible,
+                         spanningCount, insertSize);
 }
 
 //------------------------------------------------------------------------------------
@@ -228,61 +256,70 @@ static bool isReadLine(const std::string& line)
 }
 
 //------------------------------------------------------------------------------------
-// isValidReadLine() returns true if the given line correctly describes one read of a
-// read pair that matched a pattern
+// getRead() returns a pointer to a newly-allocated HitRead describing the read
+// identified by the given line, or returns NULL if the input is invalid
 
-static bool isValidReadLine(const std::string& line, std::string& name,
-                            int& leadingBlanks, std::string& sequence,
-			    int& matchingBases)
+static HitRead *getRead(const std::string& line, bool hasSpanningCol)
 {
-   StringVector col, readCol;
+   StringVector col;
+   int numCols = splitString(line, col);
 
-   if (!isReadLine(line) || splitString(line, col) != READ_COLS ||
-       splitString(col[0], readCol, ' ') != 2 || readCol[1] == "" ||
-       (leadingBlanks = col[SEQUENCE_COL].find_first_not_of(' ')) ==
-       std::string::npos || col[SEQUENCE_COL].length() !=
-       leadingBlanks + stringToNonnegInt(col[POSSIBLE_COL]) ||
-       (matchingBases = stringToNonnegInt(col[MBASES_COL])) < 0)
-      return false;
+   int expectedCols = (hasSpanningCol ? SPANNING_COL + 1 : PERCENT_COL + 1);
 
-   name     = readCol[1];
-   sequence = col[SEQUENCE_COL].substr(leadingBlanks);
+   int matchingBases, possible, spanningCount = 0;
 
-   return true;
+   if (!isReadLine(line) || numCols != expectedCols ||
+       (matchingBases  = stringToNonnegInt(col[MBASES_COL]))   <  0 ||
+       (possible       = stringToNonnegInt(col[POSSIBLE_COL])) <= 0 ||
+       hasSpanningCol &&
+       ((spanningCount = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
+	spanningCount > 1))
+      return NULL;
+
+   bool isSpanning = (spanningCount == 1);
+
+   StringVector readCol;
+   if (splitString(col[0], readCol, ' ') != 2 || readCol[1] == "")
+      return NULL;
+
+   const std::string& name     = readCol[1];
+   const std::string& sequence = col[SEQUENCE_COL];
+
+   int leadingBlanks = sequence.find_first_not_of(' '); // find first non-blank
+   if (leadingBlanks == std::string::npos ||
+       sequence.length() != leadingBlanks + possible)
+      return NULL;
+
+   std::string trimmedSequence = sequence.substr(leadingBlanks);
+
+   return new HitRead(name, leadingBlanks, trimmedSequence, matchingBases,
+                      isSpanning);
 }
 
 //------------------------------------------------------------------------------------
-// getHit() returns a pointer to a newly-allocated Hit describing the hit read from
-// the given line (the pattern) and the next two lines (the read pair), or returns
+// getHit() returns a pointer to a newly-allocated Hit describing the hit identified
+// by the given line (the pattern) and the next two lines (the read pair), or returns
 // NULL if the input is invalid
 
-static Hit *getHit(std::istream& istream, const std::string& line)
+static Hit *getHit(std::istream& istream, const std::string& patternLine,
+                   bool hasSpanningCol)
 {
-   std::string name, sequence, readLine;
-   StringVector annotation;
-   int matchingBases, possible, insertSize, leadingBlanks;
+   HitPattern *hitPattern = NULL;
+   HitRead    *hitRead1   = NULL, *hitRead2;
 
-   if (!isValidPatternLine(line, name, sequence, annotation, matchingBases, possible,
-                           insertSize))
-      return NULL;
+   std::string readLine1, readLine2;
 
-   HitPattern *pattern = new HitPattern(name, sequence, annotation, matchingBases,
-		                        possible, insertSize);
+   if ((hitPattern = getPattern(patternLine, hasSpanningCol)) &&
+       getline(istream, readLine1) &&
+       (hitRead1 = getRead(readLine1, hasSpanningCol)) &&
+       getline(istream, readLine2) &&
+       (hitRead2 = getRead(readLine2, hasSpanningCol)))
+      return new Hit(hitPattern, hitRead1, hitRead2);
 
-   HitRead *read[2];
+   delete hitPattern;
+   delete hitRead1;
 
-   for (int i = 0; i < 2; i++)
-      if (getline(istream, readLine) &&
-          isValidReadLine(readLine, name, leadingBlanks, sequence, matchingBases))
-         read[i] = new HitRead(name, leadingBlanks, sequence, matchingBases);
-      else
-      {
-         delete pattern;
-	 if (i == 1) delete read[0];
-	 return NULL;
-      }
-
-   return new Hit(pattern, read[0], read[1]);
+   return NULL;
 }
 
 //------------------------------------------------------------------------------------
@@ -296,6 +333,7 @@ struct HitCompare
       // sort by ascending pattern name,
       // then by ascending number of left bases,
       // then by ascending number of right bases,
+      // then by descending number of junction-spanning reads,
       // then by ascending read1 name
 
       int key1 = std::strcmp(a->pattern->name.c_str(), b->pattern->name.c_str());
@@ -310,6 +348,10 @@ struct HitCompare
       if (key3 != 0)
          return (key3 < 0);
 
+      int key4 = a->pattern->spanningCount - b->pattern->spanningCount;
+      if (key4 != 0)
+         return (key4 > 0);
+
       return (a->read1->name < b->read1->name);
    }
 };
@@ -323,19 +365,33 @@ static void sortHits(HitVector& hitVector)
 }
 
 //------------------------------------------------------------------------------------
-// readHits() reads hits and stores them in sorted order in hitVector; the return
-// value is the total number of read pairs processed by fuzzion2
+// markDuplicates() marks duplicate hits in the given vector, which is assumed to be
+// sorted
+
+static void markDuplicates(HitVector& hitVector)
+{
+   int numHits = hitVector.size();
+
+   for (int i = 1; i < numHits; i++)
+      if (hitVector[i]->sameAs(*hitVector[i - 1]))
+         hitVector[i]->duplicate = true;
+}
+
+//------------------------------------------------------------------------------------
+// readHits() reads hits and stores them in sorted order in hitVector; duplicate hits
+// are marked; the return value is the total number of read pairs processed
 
 uint64_t readHits(std::istream& istream, std::string& version,
                   StringVector& annotationHeading, HitVector& hitVector)
 {
    uint64_t totalReadPairs = 0;
    std::string headingLine, line;
+   bool hasSpanningCol;
 
    if (!getline(istream, headingLine))
       throw std::runtime_error("no input");
 
-   if (!isValidHeadingLine(headingLine, version, annotationHeading))
+   if (!isValidHeadingLine(headingLine, hasSpanningCol, version, annotationHeading))
       throw std::runtime_error("unexpected heading line");
 
    while (getline(istream, line))
@@ -353,9 +409,9 @@ uint64_t readHits(std::istream& istream, std::string& version,
 	 else
             throw std::runtime_error("unexpected input line: " + line);
       }
-      else
+      else // this must be the first of three lines describing a hit
       {
-         Hit *hit = getHit(istream, line);
+         Hit *hit = getHit(istream, line, hasSpanningCol);
 
 	 if (hit)
             if (hitVector.size() < MAX_HITS)
@@ -367,7 +423,10 @@ uint64_t readHits(std::istream& istream, std::string& version,
       }
 
    if (hitVector.size() > 1)
+   {
       sortHits(hitVector);
+      markDuplicates(hitVector);
+   }
 
    return totalReadPairs;
 }
@@ -376,7 +435,7 @@ uint64_t readHits(std::istream& istream, std::string& version,
 // getPatternIndices() determines the index of the first hit of each pattern; it is
 // assumed that hitVector has been sorted
 
-void getPatternIndices(const HitVector& hitVector, std::vector<int>& index)
+void getPatternIndices(const HitVector& hitVector, IntVector& index)
 {
    index.clear();
 
@@ -392,20 +451,19 @@ void getPatternIndices(const HitVector& hitVector, std::vector<int>& index)
 }
 
 //------------------------------------------------------------------------------------
-// getDistinctIndices() determines the index of each distinct hit in hitVector from
-// begin (inclusive) to end (exclusive); it is assumed that hitVector has been sorted
+// maxDisplayLength() returns the maximum length of the pattern display sequence for
+// the hits in the given vector, from indices begin (inclusive) to end (exclusive)
 
-void getDistinctIndices(const HitVector& hitVector, int begin, int end,
-                        std::vector<int>& index)
+int maxDisplayLength(const HitVector& hitVector, int begin, int end)
 {
-   index.clear();
+   int maxLength = 0;
 
-   if (begin >= end)
-      return;
+   for (int i = begin; i < end; i++)
+   {
+      int length = hitVector[i]->pattern->displaySequence.length();
+      if (length > maxLength)
+         maxLength = length;
+   }
 
-   index.push_back(begin);
-
-   for (int i = begin + 1; i < end; i++)
-      if (!hitVector[i]->sameAs(*hitVector[i - 1]))
-         index.push_back(i);
+   return maxLength;
 }

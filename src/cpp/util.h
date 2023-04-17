@@ -17,6 +17,7 @@
 inline int roundit(double d) { return static_cast<int>(d + 0.5); }
 
 typedef std::vector<bool> BoolVector;
+typedef std::vector<int>  IntVector;
 typedef std::vector<std::string> StringVector;
 
 const char TAB     = '\t';

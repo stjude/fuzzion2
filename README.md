@@ -38,8 +38,8 @@ puts them in `build/bin`.
 These programs are written in C++ and compiled using [g++] version 6 or later.
 
 [HTSlib] version 1.10.2 or later is used to read BAM files.
-Set `CPATH` and `LIBRARY_PATH` before running `make` and set
-`LD_LIBRARY_PATH` before running `fuzzion2`.
+Note: Set `CPATH` and `LIBRARY_PATH` before running `make` and set
+`LD_LIBRARY_PATH` before running `fuzzion2` using these commands:
 
 ```
 $ HTSLIB=HTSlib-installation-directory
@@ -88,7 +88,7 @@ RNA or DNA patterns.  Look in the `patterns` directory for pattern files provide
 with this distribution.
 
 The `-rank` option is also required and specifies the name of a binary file
-containing a k-mer rank table.  See the note above.
+containing a k-mer rank table.  See above for where to download this file.
 
 `fuzzion2` expects read pairs as input; single-read formats are unsupported.
 Each read pair is examined to see if it matches any of the patterns in the pattern
@@ -163,7 +163,7 @@ than 1), the order of the hits is indeterminate and a simple `diff` cannot be
 used to compare output files.  It is therefore recommended to run the `fuzzort`
 program to sort the hits.  This program sorts the hits by pattern name so that
 the hits are in a determinate order (and `diff` can be used to compare files)
-and the hits of a pattern are grouped together.
+and the hits of a pattern are together.
 
 ```
 Usage: fuzzort < fuzzion2_hits > sorted_hits
@@ -177,6 +177,7 @@ SNPs, indels, and sequencing errors are highlighted in the display.
 Usage: fuzzion2html OPTION ... < fuzzion2_hits > html
 
 The following are optional:
+  -group=string   comma-separated list of column headings, default is no grouping
   -strong=N       minimum overlap of a strong match in #bases, default is 15
   -title=string   string to include in the title of the HTML page
 ```
@@ -191,10 +192,11 @@ aggregated using the `fuzzall` program.
 Usage: fuzzum OPTION ... < fuzzion2_hits > hit_summary
 
 This option is required:
-  -id=string   identifies the sample
+  -id=string      identifies the sample
 
-The following is optional:
-  -strong=N    minimum overlap of a strong match in #bases, default is 15
+The following are optional:
+  -group=string   comma-separated list of column headings, default is no grouping
+  -strong=N       minimum overlap of a strong match in #bases, default is 15
 
 Usage: fuzzall OPTION fuzzum_filename ... > pattern_summary
 
@@ -206,9 +208,24 @@ These summaries indicate the number of distinct read pairs matching each pattern
 and of those the number of "strong" versus "weak" matches.  A match is considered
 to be strong if the alignment of the read pair to the pattern overlaps each side of
 the pattern by at least N bases, where the value of N is given by the `-strong` option.
-Otherwise, a match is regarded as weak due to insufficient overlap.  In `fuzzall`
-output, each sample ID is followed by two numbers in parentheses, e.g., (24/22),
-indicating the number of distinct matches (24) and strong matches (22).
+Otherwise, a match is regarded as weak due to insufficient overlap.  The "strong" matches
+are divided into two types: "strong+" if at least one read is junction spanning, and
+"strong-" if neither read spans the junction.
+
+In the leftmost column of a display of hits produced by `fuzzion2html`, each hit is
+labeled as either "weak," "strong-", or "strong+", or as "dup" if the read pair is a
+duplicate of another hit.  Furthermore, each read is marked as "+" if it qualifies as
+junction spanning and "-" if it does not.
+
+In `fuzzall` output, each sample ID is followed by two numbers in parentheses,
+e.g., (24/22), indicating the number of distinct matches (24) and "strong+" matches (22).
+
+It is possible to summarize the hits by pattern "group."  The `-group` option to
+`fuzzion2html` and `fuzzum` specifies a comma-separated list of annotation column
+headings in the pattern file.  The first heading in the list identifies the column by
+which hits will be grouped in the summaries; hits of patterns having the same value
+in this column are grouped together.  The other headings in the list identify "group"
+annotation columns.
 
 #### Example Run
 
@@ -282,7 +299,7 @@ Coming soon.
 
 ## COPYRIGHT
 
-Copyright 2022 St. Jude Children's Research Hospital
+Copyright 2023 St. Jude Children's Research Hospital
 
 ## LICENSE
 

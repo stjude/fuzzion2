@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -20,12 +20,15 @@ class Candidate : public Location // represents a match of a read to a pattern
 {
 public:
    Candidate(const Location& location, int inLength, int inMatchingBases)
-      : Location(location), length(inLength), matchingBases(inMatchingBases) { }
+      : Location(location), length(inLength), matchingBases(inMatchingBases),
+        junctionSpanning(false) { }
 
    virtual ~Candidate() { }
 
-   int length;        // read length
-   int matchingBases; // number of matching bases; it is zero for an unmatched mate
+   int  length;           // read length
+   int  matchingBases;    // #matching bases; it is zero for an unmatched mate
+   bool junctionSpanning; // true if the match is junction-spanning; it gets set by
+                          // Match::validOverlaps()
 };
 
 typedef std::vector<Candidate> CandidateVector;
@@ -42,14 +45,16 @@ public:
 
    virtual ~Match() { }
 
-   int  matchingBases() const { return c1.matchingBases + c2.matchingBases; }
-   int  possible()   const;
-   int  insertSize() const;
+   int matchingBases() const { return c1.matchingBases + c2.matchingBases; }
+   int possible()      const;
+   int numSpanning()   const;
+   int insertSize()    const;
 
-   bool leftmost1()  const;
-   bool rightmost2() const;
+   bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
+                      const PatternVector *patternVector, double minBases,
+		      int minOverlap);
 
-   Candidate c1, c2; // if a single-read match, c2 represents the unmatched mate
+   Candidate c1, c2;
 };
 
 typedef std::vector<Match> MatchVector;
@@ -62,9 +67,5 @@ void getMatches(const std::string& sequence1, const std::string& sequence2,
 		Minimizer maxMinimizer, double minBases, int minMins, int maxInsert,
 		int maxTrim, bool bestOverall, bool findSingle,
 		MatchVector& matchVector);
-
-bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
-                   const PatternVector *patternVector, double minBases,
-		   int minOverlap, const Match& match);
 
 #endif

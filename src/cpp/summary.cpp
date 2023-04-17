@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -16,29 +16,35 @@
 #include <stdexcept>
 
 // column headings
-const std::string READ_PAIRS = "read pairs";
-const std::string DISTINCT   = "distinct";
-const std::string STRONG     = "strong";
-const std::string PATTERN    = "pattern";
+const std::string READPAIR = "read pairs";
+const std::string DISTINCT = "distinct";
+const std::string WEAK     = "weak";
+const std::string STNOSPAN = "strong-";
+const std::string STSPAN   = "strong+";
+const std::string PATTERN  = "pattern";
+const std::string GROUP    = "pattern group";
 
-const int SAMPLE_COL         = 0;
-const int RPAIRS_COL         = 1;
-const int DISTINCT_COL       = 2;
-const int STRONG_COL         = 3;
-const int PATTERN_COL        = 4; const int OLD_PATTERN_COL = 2;
-const int MIN_HEADING_COLS   = 5;
+const int SAMPLE_COL       = 0;
+const int READPAIR_COL     = 1;
+const int DISTINCT_COL     = 2;
+const int WEAK_COL         = 3;
+const int STNOSPAN_COL     = 4;
+const int STSPAN_COL       = 5;
+const int NAME_COL         = 6;
 
 //------------------------------------------------------------------------------------
 // Summary::write() writes one line to stdout summarizing the read pairs of a sample
-// that match a pattern
+// that match a pattern or group
 
 void Summary::write() const
 {
    std::cout << sampleID
              << TAB << readPairs
-	     << TAB << distinct
-	     << TAB << strong
-	     << TAB << patternName;
+	     << TAB << distinct()
+	     << TAB << weak
+	     << TAB << strongNospan
+	     << TAB << strongSpan
+	     << TAB << name;
 
    int numAnnotations = annotation.size();
 
@@ -51,14 +57,16 @@ void Summary::write() const
 //------------------------------------------------------------------------------------
 // writeSummaryHeadingLine() writes a heading line to stdout
 
-void writeSummaryHeadingLine(const std::string& version,
+void writeSummaryHeadingLine(const std::string& version, bool grouping,
                              const StringVector& annotationHeading)
 {
    std::cout << FUZZUM << version
-             << TAB << READ_PAIRS
+             << TAB << READPAIR
 	     << TAB << DISTINCT
-	     << TAB << STRONG
-	     << TAB << PATTERN;
+	     << TAB << WEAK
+	     << TAB << STNOSPAN
+	     << TAB << STSPAN
+	     << TAB << (grouping ? GROUP : PATTERN);
 
    int numAnnotations = annotationHeading.size();
 
@@ -66,6 +74,33 @@ void writeSummaryHeadingLine(const std::string& version,
       std::cout << TAB << annotationHeading[i];
 
    std::cout << NEWLINE;
+}
+
+//------------------------------------------------------------------------------------
+// summarizeHits() returns a newly-allocated Summary of the hits in the given vector
+// from indices begin (inclusive) to end (exclusive)
+
+Summary *summarizeHits(const HitVector& hitVector, int begin, int end, int minStrong,
+                       std::string sampleID)
+{
+   int readPairs = end - begin;
+   int weak = 0, strongNospan = 0, strongSpan = 0;
+
+   for (int i = begin; i < end; i++)
+   {
+      std::string label = hitVector[i]->label(minStrong);
+
+      if (label == HIT_WEAK)
+         weak++;
+      else if (label == HIT_STRONG_NOSPAN)
+         strongNospan++;
+      else if (label == HIT_STRONG_SPAN)
+         strongSpan++;
+   }
+
+   return new Summary(sampleID, readPairs, weak, strongNospan, strongSpan,
+                      hitVector[begin]->pattern->name,
+		      hitVector[begin]->pattern->annotation);
 }
 
 //------------------------------------------------------------------------------------
@@ -77,28 +112,27 @@ static bool isHeadingLine(const std::string& line)
 }
 
 //------------------------------------------------------------------------------------
-// validateHeadingLine() verifies that the given line is a valid heading line
+// isValidHeadingLine() returns true if the given line is a valid heading line
 
-static void validateHeadingLine(const std::string& line, const std::string& filename,
+static bool isValidHeadingLine(const std::string& line,
                                StringVector& annotationHeading)
 {
    StringVector col;
    int numCols = splitString(line, col);
 
-   if (!isHeadingLine(line) || numCols < MIN_HEADING_COLS ||
-       col[RPAIRS_COL] != READ_PAIRS || col[DISTINCT_COL] != DISTINCT ||
-       col[STRONG_COL] != STRONG     || col[PATTERN_COL]  != PATTERN)
-      if (isHeadingLine(line) && numCols > OLD_PATTERN_COL &&
-          col[OLD_PATTERN_COL] == PATTERN)
-         throw std::runtime_error(FUZZUM + "format is old in " + filename +
-                                  "; rerun " + FUZZUM + "using newer version");
-      else
-         throw std::runtime_error("unexpected heading line in " + filename);
+   if (!isHeadingLine(line) || numCols <= NAME_COL ||
+       col[READPAIR_COL] != READPAIR || col[DISTINCT_COL] != DISTINCT ||
+       col[WEAK_COL]     != WEAK     || col[STNOSPAN_COL] != STNOSPAN ||
+       col[STSPAN_COL]   != STSPAN   ||
+       col[NAME_COL] != PATTERN && col[NAME_COL] != GROUP)
+      return false;
 
    annotationHeading.clear();
 
-   for (int i = MIN_HEADING_COLS; i < numCols; i++)
+   for (int i = NAME_COL + 1; i < numCols; i++)
       annotationHeading.push_back(col[i]);
+
+   return true;
 }
 
 //------------------------------------------------------------------------------------
@@ -107,21 +141,27 @@ static void validateHeadingLine(const std::string& line, const std::string& file
 
 static Summary *getSummary(const std::string& line)
 {
-   int readPairs, distinct, strong;
-   StringVector annotation, col;
-
+   StringVector col;
    int numCols = splitString(line, col);
 
-   if (numCols < MIN_HEADING_COLS ||
-       (readPairs = stringToNonnegInt(col[RPAIRS_COL]))   <= 0 ||
-       (distinct  = stringToNonnegInt(col[DISTINCT_COL])) <= 0 ||
-       (strong    = stringToNonnegInt(col[STRONG_COL]))   <  0)
+   int readPairs, weak, strongNospan, strongSpan;
+
+   if (numCols <= NAME_COL ||
+       (readPairs    = stringToNonnegInt(col[READPAIR_COL])) <= 0 ||
+       (weak         = stringToNonnegInt(col[WEAK_COL]))     <  0 ||
+       (strongNospan = stringToNonnegInt(col[STNOSPAN_COL])) <  0 ||
+       (strongSpan   = stringToNonnegInt(col[STSPAN_COL]))   <  0)
       return NULL;
 
-   for (int i = MIN_HEADING_COLS; i < numCols; i++)
+   const std::string& sampleID = col[SAMPLE_COL];
+   const std::string& name     = col[NAME_COL];
+
+   StringVector annotation;
+
+   for (int i = NAME_COL + 1; i < numCols; i++)
       annotation.push_back(col[i]);
 
-   return new Summary(col[PATTERN_COL], col[SAMPLE_COL], readPairs, distinct, strong,
+   return new Summary(sampleID, readPairs, weak, strongNospan, strongSpan, name,
                       annotation);
 }
 
@@ -132,9 +172,9 @@ struct SummaryCompare
 {
    bool operator()(Summary* const& a, Summary* const& b) const
    {
-      // sort by ascending pattern name, then by ascending sample ID
+      // sort by ascending name of pattern or group, then by ascending sample ID
 
-      int key1 = std::strcmp(a->patternName.c_str(), b->patternName.c_str());
+      int key1 = std::strcmp(a->name.c_str(), b->name.c_str());
       if (key1 != 0)
          return (key1 < 0);
 
@@ -169,7 +209,8 @@ void readSummaries(const StringVector& filename, StringVector& annotationHeading
       if (!getline(infile, line))
          throw std::runtime_error("empty file " + filename[i]);
 
-      validateHeadingLine(line, filename[i], annotationHeading);
+      if (!isValidHeadingLine(line, annotationHeading))
+         throw std::runtime_error("unexpected heading line in " + filename[i]);
 
       if (i == 0)
          headingLine = line;

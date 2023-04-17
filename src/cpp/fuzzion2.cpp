@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -300,15 +300,18 @@ void writeMatch(const std::string& name1, const std::string& sequence1,
                  (offset1 >= pattern.sequence.length() - pattern.rightBases ? 2 :
 		 (offset1 >= pattern.leftBases ? 1 : 0));
 
-   HitPattern *hitPattern = new HitPattern(pattern.name, displaySeq,
-                                           pattern.annotation, match.matchingBases(),
-					   match.possible(), match.insertSize());
+   HitPattern *hitPattern =
+      new HitPattern(pattern.name, displaySeq, pattern.annotation,
+                     match.matchingBases(), match.possible(), match.numSpanning(),
+		     match.insertSize());
 
-   HitRead *hitRead1 = new HitRead(name1, leading1, sequence1,
-                                   match.c1.matchingBases);
+   HitRead *hitRead1 =
+      new HitRead(name1, leading1, sequence1, match.c1.matchingBases,
+                  match.c1.junctionSpanning);
 
-   HitRead *hitRead2 = new HitRead(name2, leading2, sequence2,
-                                   match.c2.matchingBases);
+   HitRead *hitRead2 =
+      new HitRead(name2, leading2, sequence2, match.c2.matchingBases,
+                  match.c2.junctionSpanning);
 
    Hit hit(hitPattern, hitRead1, hitRead2);
    hit.write();
@@ -336,8 +339,8 @@ void processOrientation(const std::string& name1, const std::string& sequence1,
    int numValid = 0;
 
    while (numValid < numMatches &&
-          validOverlaps(sequence1, revcomp, patternVector, minBases, minOverlap,
-                        matchVector[numValid]))
+          matchVector[numValid].validOverlaps(sequence1, revcomp, patternVector,
+                                              minBases, minOverlap))
       numValid++;
 
    if (numValid == 0)

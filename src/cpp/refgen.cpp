@@ -9,6 +9,7 @@
 //------------------------------------------------------------------------------------
 
 #include "refgen.h"
+#include "util.h"
 #include <stdexcept>
 
 const uint32_t TWO_BIT_SIGNATURE_NOSWAP = 0x1A412743;
@@ -96,13 +97,13 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
 
    uint32_t nBlockCount = readUint32();
 
-   std::vector<int> nstart(nBlockCount); // vector of N-block first positions,
+   IntVector nstart(nBlockCount); // vector of N-block first positions,
                                          // 1-based, inclusive
 
    for (uint32_t i = 0; i < nBlockCount; i++)
       nstart[i] = readUint32() + 1;      // make it 1-based
 
-   std::vector<int> nstop(nBlockCount);  // vector of N-block last positions,
+   IntVector nstop(nBlockCount);  // vector of N-block last positions,
                                          // 1-based, inclusive
 
    for (uint32_t i = 0; i < nBlockCount; i++)

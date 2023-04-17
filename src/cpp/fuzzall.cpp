@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -73,7 +73,7 @@ class Stats // for collecting statistics
 {
 public:
    Stats()
-      : min(-1), max(-1), sum(0), value () { }
+      : min(-1), max(-1), sum(0), value() { }
 
    virtual ~Stats() { }
 
@@ -85,7 +85,7 @@ public:
    void write();
 
    int min, max, sum;
-   std::vector<int> value;
+   IntVector value;
 };
 
 //------------------------------------------------------------------------------------
@@ -150,6 +150,18 @@ void Stats::write()
 }
 
 //------------------------------------------------------------------------------------
+// writeStatsHeadings() writes to stdout the headings for one set of statistics
+
+void writeStatsHeadings(std::string category)
+{
+   std::cout << TAB << category
+             << TAB << "min"
+	     << TAB << "median"
+	     << TAB << "mean"
+	     << TAB << "max";
+}
+
+//------------------------------------------------------------------------------------
 // writeHeadingLine() writes a heading line to stdout
 
 void writeHeadingLine(const StringVector& annotationHeading)
@@ -159,12 +171,10 @@ void writeHeadingLine(const StringVector& annotationHeading)
    if (datasetName != "")
       std::cout << TAB << "dataset";
 
-   for (int i = 0; i < 2; i++)
-      std::cout << TAB << (i == 0 ? "distinct" : "strong")
-                << TAB << "min"
-		<< TAB << "median"
-		<< TAB << "mean"
-		<< TAB << "max";
+   writeStatsHeadings("distinct");
+   writeStatsHeadings("weak");
+   writeStatsHeadings("strong-");
+   writeStatsHeadings("strong+");
 
    std::cout << TAB << "IDs"
              << TAB << "ID list";
@@ -178,21 +188,22 @@ void writeHeadingLine(const StringVector& annotationHeading)
 }
 
 //------------------------------------------------------------------------------------
-// writePatternLine() writes one line to stdout with the aggregate summary for one
-// pattern
+// writeDataLine() writes one line to stdout with the aggregate summary for one
+// pattern or group
 
-void writePatternLine(const std::string& patternName,
-                      Stats& distinctStats, Stats& strongStats,
-		      int numIDs, const std::string& idList,
-		      const StringVector& annotation)
+void writeDataLine(const std::string& name, Stats& distinctStats, Stats& weakStats,
+                   Stats& strongNospanStats, Stats& strongSpanStats, int numIDs,
+		   const std::string& idList, const StringVector& annotation)
 {
-   std::cout << patternName;
+   std::cout << name;
 
    if (datasetName != "")
       std::cout << TAB << datasetName;
 
    distinctStats.write();
-   strongStats.write();
+   weakStats.write();
+   strongNospanStats.write();
+   strongSpanStats.write();
 
    std::cout << TAB << numIDs
              << TAB << idList;
@@ -206,15 +217,14 @@ void writePatternLine(const std::string& patternName,
 }
 
 //------------------------------------------------------------------------------------
-// writePattern() aggregates the data for one pattern and writes it to stdout; the
-// first summary of the pattern is in summaryVector[start]; the return value is the
-// index of the first summary of the next pattern, or summaryVector.size() if there
-// are no more patterns
+// aggregateOne() aggregates the data for one pattern or group and writes it to
+// stdout; the first summary is in summaryVector[start]; the return value is the index
+// of the first summary of the next pattern or group, or summaryVector.size() if none
 
-int writePattern(const SummaryVector& summaryVector, int start)
+int aggregateOne(const SummaryVector& summaryVector, int start)
 {
-   const std::string& patternName = summaryVector[start]->patternName;
-   Stats distinctStats, strongStats;
+   const std::string& name = summaryVector[start]->name;
+   Stats distinctStats, weakStats, strongNospanStats, strongSpanStats;
    int numIDs = 0;
    std::string idList = "";
    const StringVector& annotation = summaryVector[start]->annotation;
@@ -225,44 +235,48 @@ int writePattern(const SummaryVector& summaryVector, int start)
    do
    {
       const std::string& sampleID = summaryVector[i]->sampleID;
-      int numDistinct = 0, numStrong = 0;
+      int numDistinct = 0, numWeak = 0, numStrongNospan = 0, numStrongSpan = 0;
 
       do
       {
-         numDistinct += summaryVector[i]->distinct;
-	 numStrong   += summaryVector[i]->strong;
+         numDistinct     += summaryVector[i]->distinct();
+	 numWeak         += summaryVector[i]->weak;
+	 numStrongNospan += summaryVector[i]->strongNospan;
+	 numStrongSpan   += summaryVector[i]->strongSpan;
       }
-      while (++i < numSummaries &&
-             summaryVector[i]->patternName == patternName &&
+      while (++i < numSummaries && summaryVector[i]->name == name &&
 	     summaryVector[i]->sampleID == sampleID);
 
       distinctStats.addValue(numDistinct);
-      strongStats.addValue(numStrong);
+      weakStats.addValue(numWeak);
+      strongNospanStats.addValue(numStrongNospan);
+      strongSpanStats.addValue(numStrongSpan);
 
       if (++numIDs > 1)
          idList += ", ";
 
       idList += sampleID + "(" + intToString(numDistinct) + "/" +
-                intToString(numStrong) + ")";
+                intToString(numStrongSpan) + ")";
    }
-   while (i < numSummaries && summaryVector[i]->patternName == patternName);
+   while (i < numSummaries && summaryVector[i]->name == name);
 
-   writePatternLine(patternName, distinctStats, strongStats, numIDs, idList,
-                    annotation);
+   writeDataLine(name, distinctStats, weakStats, strongNospanStats, strongSpanStats,
+                 numIDs, idList, annotation);
 
    return i;
 }
 
 //------------------------------------------------------------------------------------
-// writeAllPatterns() aggregates the data for all patterns and writes it to stdout
+// aggregateAll() aggregates the data for all patterns or groups and writes it to
+// stdout
 
-void writeAllPatterns(const SummaryVector& summaryVector)
+void aggregateAll(const SummaryVector& summaryVector)
 {
    int numSummaries = summaryVector.size();
    int start = 0;
 
    while (start < numSummaries)
-      start = writePattern(summaryVector, start);
+      start = aggregateOne(summaryVector, start);
 }
 
 //------------------------------------------------------------------------------------
@@ -283,7 +297,7 @@ int main(int argc, char *argv[])
       readSummaries(fuzzumFilename, annotationHeading, summaryVector);
 
       writeHeadingLine(annotationHeading);
-      writeAllPatterns(summaryVector);
+      aggregateAll(summaryVector);
    }
    catch (const std::runtime_error& error)
    {

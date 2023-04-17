@@ -5,21 +5,21 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
-#include "hit.h"
-#include "summary.h"
+#include "group.h"
 #include "version.h"
 #include <iostream>
 #include <stdexcept>
 
 const std::string VERSION_NAME = FUZZUM + CURRENT_VERSION;
 
-int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
+int minStrong  = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
-std::string id = "";                // identifies the sample
+std::string id = "";                 // identifies the sample
+std::string groupColList = "";       // comma-separated list of group column headings
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -34,13 +34,16 @@ void showUsage(const char *progname)
    std::cerr
       << NEWLINE
       << "This option is required:" << NEWLINE
-      << "  -id=string   "
+      << "  -id=string      "
              << "identifies the sample" << NEWLINE;
 
    std::cerr
       << NEWLINE
-      << "The following is optional:" << NEWLINE
-      << "  -strong=N    "
+      << "The following are optional:" << NEWLINE
+      << "  -group=string   "
+             << "comma-separated list of column headings, default is no grouping"
+	     << NEWLINE
+      << "  -strong=N       "
              << "minimum overlap of a strong match in #bases, default is "
 	     << DEFAULT_MIN_STRONG << NEWLINE;
 }
@@ -64,7 +67,8 @@ bool parseArgs(int argc, char *argv[])
       if (splitString(arg, opt, '=') != 2)
          return false; // incorrect option format
 
-      if (stringOpt(opt, "id",     id) ||
+      if (stringOpt(opt, "id",     id)           ||
+          stringOpt(opt, "group",  groupColList) ||
           intOpt   (opt, "strong", minStrong))
          continue;  // this option has been recognized
 
@@ -75,43 +79,46 @@ bool parseArgs(int argc, char *argv[])
 }
 
 //------------------------------------------------------------------------------------
-// summarizePattern() writes to stdout a summary of the hits in hitVector from begin
-// (inclusive) to end (exclusive); it is assumed that hitVector has been sorted
+// writePatternSummaries() writes to stdout a summary of hits for each pattern; it is
+// assumed that hitVector has been sorted
 
-void summarizePattern(const HitVector& hitVector, int begin, int end)
+void writePatternSummaries(const StringVector& annotationHeading,
+                           const HitVector& hitVector)
 {
-   std::vector<int> index;
-   getDistinctIndices(hitVector, begin, end, index);
+   writeSummaryHeadingLine(CURRENT_VERSION, false, annotationHeading);
 
-   int numDistinct = index.size();
-   int numStrong   = 0;
-
-   for (int i = 0; i < numDistinct; i++)
-      if (hitVector[index[i]]->isStrong(minStrong))
-         numStrong++;
-
-   Summary summary(hitVector[begin]->pattern->name, id, end - begin, numDistinct,
-                   numStrong, hitVector[begin]->pattern->annotation);
-
-   summary.write();
-}
-
-//------------------------------------------------------------------------------------
-// writeSummaries() writes summaries to stdout for the hits in hitVector
-
-void writeSummaries(const StringVector& annotationHeading,
-                    const HitVector& hitVector)
-{
-   writeSummaryHeadingLine(CURRENT_VERSION, annotationHeading);
-
-   std::vector<int> index;
+   IntVector index;
    getPatternIndices(hitVector, index);
-
    int numPatterns = index.size();
 
    for (int i = 0; i < numPatterns; i++)
-      summarizePattern(hitVector, index[i],
-                       (i + 1 < numPatterns ? index[i + 1] : hitVector.size()));
+   {
+      int begin = index[i];
+      int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
+
+      Summary *summary = summarizeHits(hitVector, begin, end, minStrong, id);
+      summary->write();
+      delete summary;
+   }
+}
+
+//------------------------------------------------------------------------------------
+// writeGroupSummaries() writes to stdout a summary of hits for each pattern group
+
+void writeGroupSummaries(GroupManager& groupManager)
+{
+   writeSummaryHeadingLine(CURRENT_VERSION, true, groupManager.annotationHeading);
+
+   GroupMap& gmap = groupManager.gmap;
+
+   for (GroupMap::iterator gpos = gmap.begin(); gpos != gmap.end(); ++gpos)
+   {
+      Group& group = gpos->second;
+
+      Summary *summary = group.summarize(minStrong, id);
+      summary->write();
+      delete summary;
+   }
 }
 
 //------------------------------------------------------------------------------------
@@ -132,7 +139,13 @@ int main(int argc, char *argv[])
 
       readHits(std::cin, fuzzion2Version, annotationHeading, hitVector);
 
-      writeSummaries(annotationHeading, hitVector);
+      if (groupColList == "")
+         writePatternSummaries(annotationHeading, hitVector);
+      else
+      {
+         GroupManager groupManager(groupColList, annotationHeading, hitVector);
+	 writeGroupSummaries(groupManager);
+      }
    }
    catch (const std::runtime_error& error)
    {

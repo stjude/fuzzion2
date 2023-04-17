@@ -5,11 +5,11 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
-#include "hit.h"
+#include "group.h"
 #include "version.h"
 #include <iostream>
 #include <stdexcept>
@@ -19,12 +19,15 @@ const std::string VERSION_NAME    = "fuzzion2html " + CURRENT_VERSION;
 const int SECTION_INDENT          = 2;
 const int ANNOTATION_INDENT       = 11;
 
-const std::string BLANK           = "&nbsp;"; // non-breaking space character
-const std::string DELETE          = "-";      // represents a deleted character
-const std::string NA              = "N/A";    // not applicable
+const std::string BLANK           = "&nbsp;";  // non-breaking space character
+const std::string HYPHEN          = "&#8209;"; // non-breaking hyphen
+const std::string DELETE          = "-";       // represents a deleted character
+const std::string NA              = "N/A";     // not applicable
 
+const std::string ALIGN_CENTER    = "text-align:center";
 const std::string ALIGN_RIGHT     = "text-align:right";
 
+const std::string NAME_COLOR      = "color:darkgreen";
 const std::string DELIM_COLOR     = "color:darkred";
 const std::string MISMATCH_COLOR  = "background-color:cyan";
 const std::string INSERT_COLOR    = "background-color:yellow";
@@ -37,6 +40,7 @@ const std::string DUPLICATE_MATCH = "dup";
 int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
 std::string title = "";             // optional title
+std::string groupColList = "";      // comma-separated list of group column headings
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -51,6 +55,9 @@ void showUsage(const char *progname)
    std::cerr
       << NEWLINE
       << "The following are optional:" << NEWLINE
+      << "  -group=string   "
+             << "comma-separated list of column headings, default is no grouping"
+             << NEWLINE
       << "  -strong=N       "
              << "minimum overlap of a strong match in #bases, default is "
 	     << DEFAULT_MIN_STRONG << NEWLINE
@@ -77,7 +84,8 @@ bool parseArgs(int argc, char *argv[])
       if (splitString(arg, opt, '=') != 2)
          return false; // incorrect option format
 
-      if (intOpt   (opt, "strong", minStrong) ||
+      if (intOpt   (opt, "strong", minStrong)    ||
+          stringOpt(opt, "group",  groupColList) ||
           stringOpt(opt, "title",  title))
          continue;  // this option has been recognized
 
@@ -118,7 +126,7 @@ std::string wrap(std::string content, std::string tag, std::string style="")
 // writeHtmlBegin() writes to stdout the opening lines of the HTML document
 
 void writeHtmlBegin(const std::string& fuzzion2Version, uint64_t numReadPairs,
-                    int numMatches, int numPatterns)
+                    int numMatches, int numMatched, bool grouping)
 {
    std::string fullTitle = FUZZION2 + fuzzion2Version + " results";
 
@@ -141,11 +149,18 @@ void writeHtmlBegin(const std::string& fuzzion2Version, uint64_t numReadPairs,
 
    if (numMatches == 0)
       std::cout << "no matches";
-   else if (numMatches == 1)
-      std::cout << "1 read pair matches 1 pattern";
    else
-      std::cout << numMatches << " read pairs match " << numPatterns
-                << (numPatterns == 1 ? " pattern" : " patterns");
+   {
+      if (numMatches == 1)
+         std::cout << "1 read pair matches 1 ";
+      else
+         std::cout << numMatches << " read pairs match " << numMatched << " ";
+
+      if (grouping)
+         std::cout << (numMatched == 1 ? "pattern group" : "pattern groups");
+      else
+         std::cout << (numMatched == 1 ? "pattern" : "patterns");
+   }
 
    std::cout << NEWLINE;
 }
@@ -161,30 +176,31 @@ void writeHtmlEnd()
 }
 
 //------------------------------------------------------------------------------------
-// writePatternBegin() writes to stdout the opening lines of a pattern that has at
-// least one match
+// writeSummaryBegin() writes to stdout the opening lines of a pattern or group
 
-void writePatternBegin(const std::string& patternName, int numMatches,
-                       int numDistinct, int numStrong)
+void writeSummaryBegin(const Summary *summary, bool grouping)
 {
    std::cout << openTag("p") << NEWLINE
              << openTag("details") << NEWLINE
 	     << openTag("summary")
 	     << openTag("b")
-	     << "pattern"
-	     << "<a id=\"" << patternName << "\">" << BLANK << closeTag("a")
-	     << patternName << " has " << numMatches
-	     << " matching read " << (numMatches == 1 ? "pair" : "pairs")
-	     << " (" << numDistinct << " distinct, " << numStrong << " strong)"
-	     << closeTag("b")
+	     << (grouping ? "group" : "pattern")
+	     << "<a id=\"" << summary->name << "\">" << BLANK << closeTag("a")
+	     << wrap(summary->name, "span", NAME_COLOR)
+	     << closeTag("b") << openTag("br")
+	     << "has " << summary->readPairs << " matching read "
+	     << (summary->readPairs == 1 ? "pair" : "pairs") << " ("
+	     << summary->distinct()   << " distinct, "
+	     << summary->weak         << " weak, "
+	     << summary->strongNospan << " strong-, "
+	     << summary->strongSpan   << " strong+)"
 	     << closeTag("summary") << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
-// writePatternEnd() writes to stdout the closing line of a pattern that has at least
-// one match
+// writeSummaryEnd() writes to stdout the closing line of a pattern or group
 
-void writePatternEnd()
+void writeSummaryEnd()
 {
    std::cout << closeTag("details") << NEWLINE;
 }
@@ -193,7 +209,7 @@ void writePatternEnd()
 // writeAnnotationSectionBegin() writes to stdout the opening lines of an annotation
 // section
 
-void writeAnnotationSectionBegin()
+void writeAnnotationSectionBegin(bool grouping)
 {
    std::cout << openTag("details", "color:darkred") << NEWLINE
              << openTag("summary");
@@ -201,7 +217,8 @@ void writeAnnotationSectionBegin()
    for (int i = 1; i <= SECTION_INDENT; i++)
       std::cout << BLANK;
 
-   std::cout << "pattern annotations" << closeTag("summary") << NEWLINE;
+   std::cout << (grouping ? "group" : "pattern") << " annotations"
+             << closeTag("summary") << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -231,10 +248,10 @@ void writeAnnotation(const std::string& name, const std::string& value)
 }
 
 //------------------------------------------------------------------------------------
-// writePatternAnnotations() writes the given annotations to stdout
+// writeAllAnnotations() writes the given annotations to stdout
 
-void writePatternAnnotations(const StringVector& annotationHeading,
-                             const StringVector& annotation)
+void writeAllAnnotations(const StringVector& annotationHeading,
+                         const StringVector& annotation, bool grouping)
 {
    int numAnnotationHeadings = annotationHeading.size();
    int numAnnotations        = annotation.size();
@@ -248,7 +265,7 @@ void writePatternAnnotations(const StringVector& annotationHeading,
    if (!hasValue)
       return; // there are no annotations
 
-   writeAnnotationSectionBegin();
+   writeAnnotationSectionBegin(grouping);
 
    const std::string NO_HEADING = "";
 
@@ -314,24 +331,24 @@ void writeBlankRow()
 // writeMatchRow() writes to stdout one row of a match; if number is positive, it is a
 // pattern row; otherwise, it is a read row
 
-void writeMatchRow(const std::string& matchLabel, int number, double percentMatch,
-                   const std::string& sequence, int length, std::string name="")
+void writeMatchRow(std::string matchLabel, int number, int qualifier,
+                   double percentMatch, const std::string& sequence, int length,
+		   std::string name)
 {
    std::cout << openTag("tr") << NEWLINE;
 
    // column 1 of 6
-   if (matchLabel == "")
-      writeBlankColumn();
-   else
-      std::cout << openTag("td", ALIGN_RIGHT) << matchLabel
-		<< closeTag("td") << NEWLINE;
+   std::cout << openTag("td", ALIGN_CENTER) << matchLabel
+             << closeTag("td") << NEWLINE;
 
    // column 2 of 6
    if (number <= 0)
       writeBlankColumn();
    else
-      std::cout << openTag("td", ALIGN_RIGHT)
-	        << BLANK << openTag("b") << number << closeTag("b")
+      std::cout << openTag("td", ALIGN_CENTER)
+	        << BLANK << openTag("b")
+		<< number << (qualifier > 0 ? HYPHEN + intToString(qualifier) : "")
+	       	<< closeTag("b")
 		<< closeTag("td") << NEWLINE;
 
    // column 3 of 6
@@ -352,12 +369,9 @@ void writeMatchRow(const std::string& matchLabel, int number, double percentMatc
 	     << closeTag("td") << NEWLINE;
 
    // column 6 of 6
-   if (name == "")
-      writeBlankColumn();
-   else
-      std::cout << openTag("td")
-	        << openTag("nobr") << BLANK << name << closeTag("nobr")
-		<< closeTag("td") << NEWLINE;
+   std::cout << openTag("td")
+	     << openTag("nobr") << BLANK << name << closeTag("nobr")
+             << closeTag("td") << NEWLINE;
 
    std::cout << closeTag("tr") << NEWLINE;
 }
@@ -515,8 +529,7 @@ std::string highlightReadSequence(int numLeadingBlanks,
 // followed by two read rows representing the matching read pair and one blank row
 // for spacing
 
-void writeMatch(const std::string& matchLabel, int number, const Hit& hit,
-                int maxPatternLen)
+void writeMatch(int number, int qualifier, const Hit& hit, int maxPatternLen)
 {
    std::string highlightPattern =
       highlightPatternSequence(hit.pattern->displaySequence, hit.pattern->leftBases,
@@ -532,16 +545,14 @@ void writeMatch(const std::string& matchLabel, int number, const Hit& hit,
                             hit.read2->percentMatch(), hit.pattern->displaySequence,
 			    hit.pattern->leftBases, hit.pattern->delim2);
 
-   const std::string NO_LABEL = "";
+   writeMatchRow(hit.label(minStrong), number, qualifier, hit.pattern->percentMatch(),
+                 highlightPattern, hit.pattern->insertSize, hit.pattern->name);
 
-   writeMatchRow(matchLabel, number, hit.pattern->percentMatch(), highlightPattern,
-                 hit.pattern->insertSize);
+   writeMatchRow((hit.read1->isSpanning ? "+" : "-"), 0, 0, hit.read1->percentMatch(),
+		 highlightRead1, hit.read1->sequence.length(), hit.read1->name);
 
-   writeMatchRow(NO_LABEL, 0, hit.read1->percentMatch(), highlightRead1,
-                 hit.read1->sequence.length(), hit.read1->name);
-
-   writeMatchRow(NO_LABEL, 0, hit.read2->percentMatch(), highlightRead2,
-                 hit.read2->sequence.length(), hit.read2->name);
+   writeMatchRow((hit.read2->isSpanning ? "+" : "-"), 0, 0, hit.read2->percentMatch(),
+		 highlightRead2, hit.read2->sequence.length(), hit.read2->name);
 
    writeBlankRow();
 }
@@ -553,76 +564,102 @@ void writeMatch(const std::string& matchLabel, int number, const Hit& hit,
 void writePattern(const StringVector& annotationHeading, const HitVector& hitVector,
                   int begin, int end)
 {
-   std::vector<int> index;
-   getDistinctIndices(hitVector, begin, end, index);
+   Summary *summary = summarizeHits(hitVector, begin, end, minStrong);
+   writeSummaryBegin(summary, false);
+   delete summary;
 
-   int numDistinct = index.size();
-   int numStrong   = 0;
-
-   for (int i = 0; i < numDistinct; i++)
-      if (hitVector[index[i]]->isStrong(minStrong))
-         numStrong++;
-
-   writePatternBegin(hitVector[begin]->pattern->name, end - begin, numDistinct,
-                     numStrong);
-
-   writePatternAnnotations(annotationHeading, hitVector[begin]->pattern->annotation);
+   writeAllAnnotations(annotationHeading, hitVector[begin]->pattern->annotation,
+                       false);
 
    writeMatchSectionBegin();
 
-   int maxPatternLen = 0;
+   int maxPatternLen = maxDisplayLength(hitVector, begin, end);
 
    for (int i = begin; i < end; i++)
    {
-      int patternLen = hitVector[i]->pattern->displaySequence.length();
-
-      if (patternLen > maxPatternLen)
-         maxPatternLen = patternLen;
-   }
-
-   int number = 1;
-
-   for (int i = 0; i < numDistinct; i++)
-   {
-      int first = index[i];                                   // inclusive
-      int last  = (i + 1 < numDistinct ? index[i + 1] : end); // exclusive
-
-      for (int j = first; j < last; j++)
-      {
-         std::string matchLabel;
-
-	 if (j == first)
-            matchLabel = (hitVector[j]->isStrong(minStrong) ?
-                          STRONG_MATCH : WEAK_MATCH);
-	 else
-            matchLabel = DUPLICATE_MATCH;
-
-	 writeMatch(matchLabel, number++, *hitVector[j], maxPatternLen);
-      }
+      const Hit *hit = hitVector[i];
+      writeMatch(i - begin + 1, 0, *hit, maxPatternLen);
    }
 
    writeMatchSectionEnd();
 
-   writePatternEnd();
+   writeSummaryEnd();
 }
 
 //------------------------------------------------------------------------------------
-// writeHtml() writes an HTML document to stdout
+// writeGroup() writes to stdout the annotations and matches of a group
 
-void writeHtml(const std::string& fuzzion2Version,
-               const StringVector& annotationHeading,
-	       const HitVector& hitVector, uint64_t numReadPairs)
+void writeGroup(const StringVector& annotationHeading, Group& group)
 {
-   std::vector<int> index;
-   getPatternIndices(hitVector, index);
+   Summary *summary = group.summarize(minStrong);
+   writeSummaryBegin(summary, true);
+   delete summary;
 
+   writeAllAnnotations(annotationHeading, group.annotation, true);
+
+   writeMatchSectionBegin();
+
+   int maxPatternLen = group.maxGroupDisplayLength();
+
+   int number = 1;
+
+   for (ReadMap::iterator rpos = group.rmap.begin(); rpos != group.rmap.end(); ++rpos)
+   {
+      const HitVector& hitVector = rpos->second;
+      int numHits = hitVector.size();
+
+      for (int i = 0; i < numHits; i++)
+      {
+         const Hit *hit = hitVector[i];
+         writeMatch(number, (numHits > 1 ? i + 1 : 0), *hit, maxPatternLen);
+      }
+
+      number++;
+   }
+
+   writeMatchSectionEnd();
+
+   writeSummaryEnd();
+}
+
+//------------------------------------------------------------------------------------
+// writeAllPatterns() writes to stdout an HTML document displaying matches of patterns
+
+void writeAllPatterns(const std::string& fuzzion2Version,
+                      const StringVector& annotationHeading,
+                      const HitVector& hitVector, uint64_t numReadPairs)
+{
+   IntVector index;
+   getPatternIndices(hitVector, index);
    int numPatterns = index.size();
 
-   writeHtmlBegin(fuzzion2Version, numReadPairs, hitVector.size(), numPatterns);
+   writeHtmlBegin(fuzzion2Version, numReadPairs, hitVector.size(), numPatterns,
+                  false);
 
    for (int i = 0; i < numPatterns; i++)
-      writePattern(annotationHeading, hitVector, index[i],
-                   (i + 1 < numPatterns ? index[i + 1] : hitVector.size()));
+   {
+      int begin = index[i];
+      int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
+
+      writePattern(annotationHeading, hitVector, begin, end);
+   }
+
+   writeHtmlEnd();
+}
+
+//------------------------------------------------------------------------------------
+// writeAllGroups() writes to stdout an HTML document displaying matches of groups
+
+void writeAllGroups(const std::string& fuzzion2Version, uint64_t numReadPairs,
+                    GroupManager& groupManager)
+{
+   writeHtmlBegin(fuzzion2Version, numReadPairs, groupManager.readPairCount(),
+                  groupManager.gmap.size(), true);
+
+   GroupMap& gmap = groupManager.gmap;
+
+   for (GroupMap::iterator gpos = gmap.begin(); gpos != gmap.end(); ++gpos)
+      writeGroup(groupManager.annotationHeading, gpos->second);
 
    writeHtmlEnd();
 }
@@ -643,10 +680,17 @@ int main(int argc, char *argv[])
       StringVector annotationHeading;
       HitVector    hitVector;
 
-      uint64_t numReadPairs = readHits(std::cin, fuzzion2Version, annotationHeading,
-                                       hitVector);
+      uint64_t numReadPairs =
+         readHits(std::cin, fuzzion2Version, annotationHeading, hitVector);
 
-      writeHtml(fuzzion2Version, annotationHeading, hitVector, numReadPairs);
+      if (groupColList == "")
+         writeAllPatterns(fuzzion2Version, annotationHeading, hitVector,
+                          numReadPairs);
+      else
+      {
+         GroupManager groupManager(groupColList, annotationHeading, hitVector);
+	 writeAllGroups(fuzzion2Version, numReadPairs, groupManager);
+      }
    }
    catch (const std::runtime_error& error)
    {

@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2023 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -61,6 +61,19 @@ int Match::possible() const
 }
 
 //------------------------------------------------------------------------------------
+// Match::numSpanning() returns the number of junction-spanning reads (0, 1 or 2)
+
+int Match::numSpanning() const
+{
+   if (c1.junctionSpanning && c2.junctionSpanning)
+      return 2;
+   else if (c1.junctionSpanning || c2.junctionSpanning)
+      return 1;
+   else
+      return 0;
+}
+
+//------------------------------------------------------------------------------------
 // Match::insertSize() returns the insert size of this match
 
 int Match::insertSize() const
@@ -73,23 +86,6 @@ int Match::insertSize() const
       return std::max(c1.length, c2.offset - c1.offset + c2.length);
    else                             // c2 is aligned ahead of c1
       return std::max(c2.length, c1.offset - c2.offset + c1.length);
-}
-
-//------------------------------------------------------------------------------------
-// Match::leftmost1() returns true if c1 is the left-most matching read
-
-bool Match::leftmost1() const
-{
-   return (c1.matchingBases > 0 && (c2.matchingBases == 0 || c1.offset <= c2.offset));
-}
-
-//------------------------------------------------------------------------------------
-// Match::rightmost2() returns true if c2 is the right-most matching read
-
-bool Match::rightmost2() const
-{
-   return (c2.matchingBases > 0 && (c1.matchingBases == 0 ||
-           c2.offset + c2.length >= c1.offset + c1.length));
 }
 
 //------------------------------------------------------------------------------------
@@ -441,35 +437,38 @@ static bool overlapRight(const std::string& sequence, const Pattern& pattern,
 }
 
 //------------------------------------------------------------------------------------
-// validOverlaps() returns true if the given match satisfies the overlap requirements
+// Match::validOverlaps() returns true if the given match satisfies the overlap
+// requirements
 
-bool validOverlaps(const std::string& sequence1, const std::string& sequence2,
-                   const PatternVector *patternVector, double minBases,
-                   int minOverlap, const Match& match)
+bool Match::validOverlaps(const std::string& sequence1, const std::string& sequence2,
+                          const PatternVector *patternVector, double minBases,
+                          int minOverlap)
 {
-   const Pattern& pattern = (*patternVector)[match.c1.index];
+   const Pattern& pattern = (*patternVector)[c1.index];
 
-   int offset1 = match.c1.offset;
-   int offset2 = match.c2.offset;
+   bool left1 = false, right1 = false;
+   bool left2 = false, right2 = false;
+
+   if (c1.matchingBases > 0)
+   {
+      left1  = overlapLeft (sequence1, pattern, c1.offset, minBases, minOverlap);
+      right1 = overlapRight(sequence1, pattern, c1.offset, minBases, minOverlap);
+   }
+
+   if (c2.matchingBases > 0)
+   {
+      left2  = overlapLeft (sequence2, pattern, c2.offset, minBases, minOverlap);
+      right2 = overlapRight(sequence2, pattern, c2.offset, minBases, minOverlap);
+   }
+
+   c1.junctionSpanning = (left1 && right1);
+   c2.junctionSpanning = (left2 && right2);
+
+   if (c1.junctionSpanning || c2.junctionSpanning)
+      return true;
 
    if (pattern.hasBraces)
-      return (match.c1.matchingBases > 0 &&
-              overlapLeft (sequence1, pattern, offset1, minBases, minOverlap) &&
-              overlapRight(sequence1, pattern, offset1, minBases, minOverlap) ||
-	      match.c2.matchingBases > 0 &&
-	      overlapLeft (sequence2, pattern, offset2, minBases, minOverlap) &&
-	      overlapRight(sequence2, pattern, offset2, minBases, minOverlap));
+      return false; // a junction-spanning read is required in this case
 
-   // pattern has brackets
-   bool left1  = match.leftmost1();
-   bool right2 = match.rightmost2();
-
-   const std::string& sequenceL = (left1  ? sequence1 : sequence2);
-                  int offsetL   = (left1  ? offset1   : offset2);
-
-   const std::string& sequenceR = (right2 ? sequence2 : sequence1);
-                  int offsetR   = (right2 ? offset2   : offset1);
-
-   return (overlapLeft (sequenceL, pattern, offsetL, minBases, minOverlap) &&
-           overlapRight(sequenceR, pattern, offsetR, minBases, minOverlap));
+   return (left1 && right2 || left2 && right1);
 }
