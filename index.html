@@ -117,8 +117,8 @@ puts them in <code>build/bin</code>.</p>
 <h4 id="dependencies">Dependencies</h4>
 <p>These programs are written in C++ and compiled using <a href="https://gcc.gnu.org/">g++</a> version 6 or later.</p>
 <p><a href="https://github.com/samtools/htslib">HTSlib</a> version 1.10.2 or later is used to read BAM files.
-Set <code>CPATH</code> and <code>LIBRARY_PATH</code> before running <code>make</code> and set
-<code>LD_LIBRARY_PATH</code> before running <code>fuzzion2</code>.</p>
+Note: Set <code>CPATH</code> and <code>LIBRARY_PATH</code> before running <code>make</code> and set
+<code>LD_LIBRARY_PATH</code> before running <code>fuzzion2</code> using these commands:</p>
 <pre><code>$ HTSLIB=HTSlib-installation-directory
 $ export CPATH=$CPATH:$HTSLIB/include
 $ export LIBRARY_PATH=$LIBRARY_PATH:$HTSLIB/lib
@@ -155,7 +155,7 @@ The following are optional:
 RNA or DNA patterns.  Look in the <code>patterns</code> directory for pattern files provided
 with this distribution.</p>
 <p>The <code>-rank</code> option is also required and specifies the name of a binary file
-containing a k-mer rank table.  See the note above.</p>
+containing a k-mer rank table.  See above for where to download this file.</p>
 <p><code>fuzzion2</code> expects read pairs as input; single-read formats are unsupported.
 Each read pair is examined to see if it matches any of the patterns in the pattern
 file.  Read pairs are obtained from:</p>
@@ -215,7 +215,7 @@ than 1), the order of the hits is indeterminate and a simple <code>diff</code> c
 used to compare output files.  It is therefore recommended to run the <code>fuzzort</code>
 program to sort the hits.  This program sorts the hits by pattern name so that
 the hits are in a determinate order (and <code>diff</code> can be used to compare files)
-and the hits of a pattern are grouped together.</p>
+and the hits of a pattern are together.</p>
 <pre><code>Usage: fuzzort &lt; fuzzion2_hits &gt; sorted_hits
 </code></pre>
 <p>Run <code>fuzzion2html</code> to produce an HTML file that provides an attractive display
@@ -224,6 +224,7 @@ SNPs, indels, and sequencing errors are highlighted in the display.</p>
 <pre><code>Usage: fuzzion2html OPTION ... &lt; fuzzion2_hits &gt; html
 
 The following are optional:
+  -group=string   comma-separated list of column headings, default is no grouping
   -strong=N       minimum overlap of a strong match in #bases, default is 15
   -title=string   string to include in the title of the HTML page
 </code></pre>
@@ -234,10 +235,11 @@ aggregated using the <code>fuzzall</code> program.</p>
 <pre><code>Usage: fuzzum OPTION ... &lt; fuzzion2_hits &gt; hit_summary
 
 This option is required:
-  -id=string   identifies the sample
+  -id=string      identifies the sample
 
-The following is optional:
-  -strong=N    minimum overlap of a strong match in #bases, default is 15
+The following are optional:
+  -group=string   comma-separated list of column headings, default is no grouping
+  -strong=N       minimum overlap of a strong match in #bases, default is 15
 
 Usage: fuzzall OPTION fuzzum_filename ... &gt; pattern_summary
 
@@ -248,9 +250,21 @@ The following is optional:
 and of those the number of "strong" versus "weak" matches.  A match is considered
 to be strong if the alignment of the read pair to the pattern overlaps each side of
 the pattern by at least N bases, where the value of N is given by the <code>-strong</code> option.
-Otherwise, a match is regarded as weak due to insufficient overlap.  In <code>fuzzall</code>
-output, each sample ID is followed by two numbers in parentheses, e.g., (24/22),
-indicating the number of distinct matches (24) and strong matches (22).</p>
+Otherwise, a match is regarded as weak due to insufficient overlap.  The "strong" matches
+are divided into two types: "strong+" if at least one read is junction spanning, and
+"strong-" if neither read spans the junction.</p>
+<p>In the leftmost column of a display of hits produced by <code>fuzzion2html</code>, each hit is
+labeled as either "weak," "strong-", or "strong+", or as "dup" if the read pair is a
+duplicate of another hit.  Furthermore, each read is marked as "+" if it qualifies as
+junction spanning and "-" if it does not.</p>
+<p>In <code>fuzzall</code> output, each sample ID is followed by two numbers in parentheses,
+e.g., (24/22), indicating the number of distinct matches (24) and "strong+" matches (22).</p>
+<p>It is possible to summarize the hits by pattern "group."  The <code>-group</code> option to
+<code>fuzzion2html</code> and <code>fuzzum</code> specifies a comma-separated list of annotation column
+headings in the pattern file.  The first heading in the list identifies the column by
+which hits will be grouped in the summaries; hits of patterns having the same value
+in this column are grouped together.  The other headings in the list identify "group"
+annotation columns.</p>
 <h4 id="example-run">Example Run</h4>
 <p>The <code>test</code> directory contains some files you can use to run a simple test:</p>
 <pre><code>fuzzion2 -pattern=example_patterns.txt -rank=fuzzion2_hg38_k15.krt \
@@ -307,7 +321,7 @@ in progress.</p>
 <h4 id="programs-for-creating-pattern-files">Programs for Creating Pattern Files</h4>
 <p>Coming soon.</p>
 <h2 id="copyright">COPYRIGHT</h2>
-<p>Copyright 2022 St. Jude Children's Research Hospital</p>
+<p>Copyright 2023 St. Jude Children's Research Hospital</p>
 <h2 id="license">LICENSE</h2>
 <p>Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -399,5 +413,5 @@ limitations under the License.</p></div>
 
 <!--
 MkDocs version : 1.4.2
-Build Date UTC : 2022-12-05 16:08:46.949112+00:00
+Build Date UTC : 2023-04-17 15:14:31.029305+00:00
 -->
