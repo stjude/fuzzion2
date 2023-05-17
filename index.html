@@ -89,13 +89,14 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="fuzzion2">fuzzion2</h1>
-<p>There are six programs in the Fuzzion2 suite: <code>fuzzion2</code>, <code>fuzzort</code>,
-<code>fuzzum</code>, <code>fuzzion2html</code>, <code>fuzzall</code>, and <code>kmerank</code>.</p>
+<p>There are seven programs in the Fuzzion2 suite: <code>fuzzion2</code>, <code>fuzzort</code>,
+<code>fuzzum</code>, <code>fuzzion2html</code>, <code>fuzzall</code>, <code>fuzzhop</code>, and <code>kmerank</code>.</p>
 <p>The main program is <code>fuzzion2</code> which searches paired-end RNA or DNA to
 identify read pairs that match fusion patterns.  The matching read pairs
 are sorted by <code>fuzzort</code>; summarized by <code>fuzzum</code>; and converted to HTML by
 <code>fuzzion2html</code> for viewing using a browser.  The <code>fuzzall</code> program
-aggregates summaries produced by <code>fuzzum</code>.</p>
+aggregates summaries produced by <code>fuzzum</code>.  The <code>fuzzhop</code> program reports
+matching read pairs that may be artifacts due to index hopping.</p>
 <p>The <code>fuzzion2</code> program requires as input a k-mer rank table.
 Download the file named <code>fuzzion2_hg38_k15.krt</code> from
 <a href="https://doi.org/10.5281/zenodo.6122447"><code>https://doi.org/10.5281/zenodo.6122447</code></a>.
@@ -112,7 +113,7 @@ suite requires less than 1 GB of memory.</p>
 $ cd fuzzion2
 $ make
 </code></pre>
-<p>This builds executable files for all six programs of the Fuzzion2 suite and
+<p>This builds executable files for all seven programs of the Fuzzion2 suite and
 puts them in <code>build/bin</code>.</p>
 <h4 id="dependencies">Dependencies</h4>
 <p>These programs are written in C++ and compiled using <a href="https://gcc.gnu.org/">g++</a> version 6 or later.</p>
@@ -265,6 +266,13 @@ headings in the pattern file.  The first heading in the list identifies the colu
 which hits will be grouped in the summaries; hits of patterns having the same value
 in this column are grouped together.  The other headings in the list identify "group"
 annotation columns.</p>
+<p>It is possible that a read pair matching a pattern was assigned to the wrong sample
+during the sequencing process.  This phenomenon is known as "index hopping."  Given the
+hits from two or more samples that were sequenced together, the <code>fuzzhop</code> program reports
+the numbers of hits of a pattern that came from the same flow cell and lane but were
+assigned to different samples.  Each input file contains the hits from a single sample.</p>
+<pre><code>Usage: fuzzhop fuzzion2_filename1 fuzzion2_filename2 ... &gt; possible_index_hops
+</code></pre>
 <h4 id="example-run">Example Run</h4>
 <p>The <code>test</code> directory contains some files you can use to run a simple test:</p>
 <pre><code>fuzzion2 -pattern=example_patterns.txt -rank=fuzzion2_hg38_k15.krt \
@@ -412,6 +420,6 @@ limitations under the License.</p></div>
 </html>
 
 <!--
-MkDocs version : 1.4.2
-Build Date UTC : 2023-04-17 15:14:31.029305+00:00
+MkDocs version : 1.4.3
+Build Date UTC : 2023-05-17 18:42:12.166902+00:00
 -->
