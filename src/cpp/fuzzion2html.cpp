@@ -187,9 +187,9 @@ void writeSummaryBegin(const Summary *summary, bool grouping)
 	     << (grouping ? "group" : "pattern")
 	     << "<a id=\"" << summary->name << "\">" << BLANK << closeTag("a")
 	     << wrap(summary->name, "span", NAME_COLOR)
-	     << closeTag("b") << openTag("br")
-	     << "has " << summary->readPairs << " matching read "
-	     << (summary->readPairs == 1 ? "pair" : "pairs") << " ("
+	     << " has " << summary->readPairs << " matching read "
+	     << (summary->readPairs == 1 ? "pair" : "pairs")
+	     << closeTag("b") << " ("
 	     << summary->distinct()   << " distinct, "
 	     << summary->weak         << " weak, "
 	     << summary->strongNospan << " strong-, "

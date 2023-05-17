@@ -1,13 +1,14 @@
 # fuzzion2
 
-There are six programs in the Fuzzion2 suite: `fuzzion2`, `fuzzort`,
-`fuzzum`, `fuzzion2html`, `fuzzall`, and `kmerank`.
+There are seven programs in the Fuzzion2 suite: `fuzzion2`, `fuzzort`,
+`fuzzum`, `fuzzion2html`, `fuzzall`, `fuzzhop`, and `kmerank`.
 
 The main program is `fuzzion2` which searches paired-end RNA or DNA to
 identify read pairs that match fusion patterns.  The matching read pairs
 are sorted by `fuzzort`; summarized by `fuzzum`; and converted to HTML by
 `fuzzion2html` for viewing using a browser.  The `fuzzall` program
-aggregates summaries produced by `fuzzum`.
+aggregates summaries produced by `fuzzum`.  The `fuzzhop` program reports
+matching read pairs that may be artifacts due to index hopping.
 
 The `fuzzion2` program requires as input a k-mer rank table.
 Download the file named `fuzzion2_hg38_k15.krt` from
@@ -30,7 +31,7 @@ $ cd fuzzion2
 $ make
 ```
 
-This builds executable files for all six programs of the Fuzzion2 suite and
+This builds executable files for all seven programs of the Fuzzion2 suite and
 puts them in `build/bin`.
 
 #### Dependencies
@@ -226,6 +227,16 @@ headings in the pattern file.  The first heading in the list identifies the colu
 which hits will be grouped in the summaries; hits of patterns having the same value
 in this column are grouped together.  The other headings in the list identify "group"
 annotation columns.
+
+It is possible that a read pair matching a pattern was assigned to the wrong sample
+during the sequencing process.  This phenomenon is known as "index hopping."  Given the
+hits from two or more samples that were sequenced together, the `fuzzhop` program reports
+the numbers of hits of a pattern that came from the same flow cell and lane but were
+assigned to different samples.  Each input file contains the hits from a single sample.
+
+```
+Usage: fuzzhop fuzzion2_filename1 fuzzion2_filename2 ... > possible_index_hops
+``` 
 
 #### Example Run
 
