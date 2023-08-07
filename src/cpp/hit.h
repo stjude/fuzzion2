@@ -41,11 +41,7 @@ public:
    virtual ~HitPattern() { }
 
    double percentMatch() const { return (100.0 * matchingBases / possible); }
-
-   bool isStrong(int minStrong) const
-   { return (leftBases >= minStrong && rightBases >= minStrong); }
-
-   bool isSpanning() const { return (spanningCount > 0); }
+   bool   isSpanning()   const { return (spanningCount > 0); }
 
    void write() const;
 
@@ -61,14 +57,15 @@ class HitRead
 {
 public:
    HitRead(const std::string& inName, int inLeadingBlanks,
-           const std::string& inSequence, int inMatchingBases, bool inIsSpanning)
+           const std::string& inSequence, int inMatchingBases, bool inIsSpanning,
+	   int inLeftOverlap, int inRightOverlap)
       : name(inName), leadingBlanks(inLeadingBlanks), sequence(inSequence),
-	matchingBases(inMatchingBases), isSpanning(inIsSpanning) { }
+	matchingBases(inMatchingBases), isSpanning(inIsSpanning),
+	leftOverlap(inLeftOverlap), rightOverlap(inRightOverlap) { }
 
    virtual ~HitRead() { }
 
-   int possible() const { return sequence.length(); }
-
+   int    possible()     const { return sequence.length(); }
    double percentMatch() const { return (100.0 * matchingBases / possible()); }
 
    void write() const;
@@ -78,6 +75,8 @@ public:
    std::string sequence; // read sequence
    int  matchingBases;   // number of matching bases (zero for an unmatched mate)
    bool isSpanning;      // true if this is a junction-spanning read
+   int  leftOverlap;     // number of overlapping bases on the left side
+   int  rightOverlap;    // number of overlapping bases on the right side
 };
 
 //------------------------------------------------------------------------------------
@@ -91,7 +90,7 @@ public:
    virtual ~Hit() { delete pattern; delete read1; delete read2; }
 
    bool sameAs(const Hit& other) const;
-   bool isStrong(int minStrong)  const { return pattern->isStrong(minStrong); }
+   bool isStrong(int minStrong)  const;
    bool isSpanning()             const { return pattern->isSpanning(); }
 
    std::string label(int minStrong) const;

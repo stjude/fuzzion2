@@ -14,7 +14,7 @@
 
 #include <string>
 
-const std::string CURRENT_VERSION = "v1.3.0";
+const std::string CURRENT_VERSION = "v1.4.0";
 
 const std::string COPYRIGHT = "copyright 2023 St. Jude Children's Research Hospital";
 

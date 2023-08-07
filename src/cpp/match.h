@@ -21,14 +21,20 @@ class Candidate : public Location // represents a match of a read to a pattern
 public:
    Candidate(const Location& location, int inLength, int inMatchingBases)
       : Location(location), length(inLength), matchingBases(inMatchingBases),
-        junctionSpanning(false) { }
+	leftOverlap(0), leftMatching(0), rightOverlap(0), rightMatching(0),
+	junctionSpanning(false) { }
 
    virtual ~Candidate() { }
 
-   int  length;           // read length
-   int  matchingBases;    // #matching bases; it is zero for an unmatched mate
-   bool junctionSpanning; // true if the match is junction-spanning; it gets set by
-                          // Match::validOverlaps()
+   int  length;                      // read length
+   int  matchingBases;               // #matching bases (zero for an unmatched mate)
+
+   void setLeftRight(const std::string& sequence, const PatternVector *patternVector);
+   int  leftOverlap,  leftMatching;  // #overlapping and matching bases on the left
+   int  rightOverlap, rightMatching; // #overlapping and matching bases on the right
+
+   void setJunctionSpanning(double minBases, int minOverlap);
+   bool junctionSpanning;            // true if the read spans the junction
 };
 
 typedef std::vector<Candidate> CandidateVector;

@@ -25,6 +25,8 @@ const std::string MBASES     = "matching bases";
 const std::string POSSIBLE   = "possible";
 const std::string PERCENT    = "% match";
 const std::string SPANNING   = "junction spanning";
+const std::string OVLEFT     = "left overlap";
+const std::string OVRIGHT    = "right overlap";
 const std::string ISIZE      = "insert size";
 
 const int SEQUENCE_COL       = 1;
@@ -32,7 +34,10 @@ const int MBASES_COL         = 2;
 const int POSSIBLE_COL       = 3;
 const int PERCENT_COL        = 4;
 const int SPANNING_COL       = 5;
-const int ISIZE_COL          = 5; // add one if spanning column is present
+const int OVLEFT_COL         = 6;
+const int OVRIGHT_COL        = 7;
+const int ISIZE_COL          = 8;
+const int FIRST_ANNOT_COL    = 9; // first annotation column, if any
 
 //------------------------------------------------------------------------------------
 // HitPattern::write() writes one line to stdout describing the pattern matched by a
@@ -46,6 +51,8 @@ void HitPattern::write() const
 	     << TAB << possible
 	     << TAB << doubleToString(percentMatch())
 	     << TAB << spanningCount
+	     << TAB // no entry in this column
+	     << TAB // no entry in this column
 	     << TAB << insertSize;
 
    int numAnnotations = annotation.size();
@@ -68,6 +75,8 @@ void HitRead::write() const
 	     << TAB << possible()
 	     << TAB << doubleToString(percentMatch())
 	     << TAB << (isSpanning ? 1 : 0)
+	     << TAB << leftOverlap
+	     << TAB << rightOverlap
 	     << NEWLINE;
 }
 
@@ -79,6 +88,15 @@ bool Hit::sameAs(const Hit& other) const
    return (pattern->name == other.pattern->name &&
            pattern->leftBases  == other.pattern->leftBases &&
 	   pattern->rightBases == other.pattern->rightBases);
+}
+
+//------------------------------------------------------------------------------------
+// Hit::isStrong() returns true if this hit is considered a "strong" hit
+
+bool Hit::isStrong(int minStrong) const
+{
+   return (std::max(read1->leftOverlap,  read2->leftOverlap)  >= minStrong &&
+           std::max(read1->rightOverlap, read2->rightOverlap) >= minStrong);
 }
 
 //------------------------------------------------------------------------------------
@@ -110,6 +128,8 @@ void writeHitHeadingLine(const std::string& version,
 	     << TAB << POSSIBLE
 	     << TAB << PERCENT
 	     << TAB << SPANNING
+	     << TAB << OVLEFT
+	     << TAB << OVRIGHT
 	     << TAB << ISIZE;
 
    int numAnnotations = annotationHeading.size();
@@ -131,21 +151,17 @@ static bool isHeadingLine(const std::string& line)
 //------------------------------------------------------------------------------------
 // isValidHeadingLine() returns true if the given line is a valid heading line
 
-static bool isValidHeadingLine(const std::string& line, bool& hasSpanningCol,
-                               std::string& version, StringVector& annotationHeading)
+static bool isValidHeadingLine(const std::string& line, std::string& version,
+                               StringVector& annotationHeading)
 {
    StringVector col;
    int numCols = splitString(line, col);
 
-   if (!isHeadingLine(line) || numCols <= PERCENT_COL ||
-       col[SEQUENCE_COL] != SEQUENCE || col[MBASES_COL]  != MBASES ||
-       col[POSSIBLE_COL] != POSSIBLE || col[PERCENT_COL] != PERCENT)
-      return false;
-
-   hasSpanningCol = (numCols > SPANNING_COL && col[SPANNING_COL] == SPANNING);
-   int isizeCol   = (hasSpanningCol ? ISIZE_COL + 1 : ISIZE_COL);
-
-   if (numCols <= isizeCol || col[isizeCol] != ISIZE)
+   if (!isHeadingLine(line) || numCols <= ISIZE_COL ||
+       col[SEQUENCE_COL] != SEQUENCE || col[MBASES_COL]  != MBASES  ||
+       col[POSSIBLE_COL] != POSSIBLE || col[PERCENT_COL] != PERCENT ||
+       col[SPANNING_COL] != SPANNING || col[OVLEFT_COL]  != OVLEFT  ||
+       col[OVRIGHT_COL]  != OVRIGHT  || col[ISIZE_COL]   != ISIZE)
       return false;
 
    StringVector versionCol;
@@ -156,7 +172,7 @@ static bool isValidHeadingLine(const std::string& line, bool& hasSpanningCol,
 
    annotationHeading.clear();
 
-   for (int i = isizeCol + 1; i < numCols; i++)
+   for (int i = FIRST_ANNOT_COL; i < numCols; i++)
       annotationHeading.push_back(col[i]);
 
    return true;
@@ -212,22 +228,19 @@ static bool isPatternLine(const std::string& line)
 // getPattern() returns a pointer to a newly-allocated HitPattern describing the
 // pattern identified by the given line, or returns NULL if the input is invalid
 
-static HitPattern *getPattern(const std::string& line, bool hasSpanningCol)
+static HitPattern *getPattern(const std::string& line)
 {
    StringVector col;
    int numCols  = splitString(line, col);
 
-   int isizeCol = (hasSpanningCol ? ISIZE_COL + 1 : ISIZE_COL);
+   int matchingBases, possible, spanningCount, insertSize;
 
-   int matchingBases, possible, spanningCount = 0, insertSize;
-
-   if (!isPatternLine(line) || numCols <= isizeCol ||
+   if (!isPatternLine(line) || numCols <= ISIZE_COL ||
        (matchingBases  = stringToNonnegInt(col[MBASES_COL]))   <= 0 ||
        (possible       = stringToNonnegInt(col[POSSIBLE_COL])) <= 0 ||
-       hasSpanningCol &&
-       ((spanningCount = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
-	spanningCount > 2) ||
-       (insertSize     = stringToNonnegInt(col[isizeCol]))     <= 0)
+       (spanningCount  = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
+       spanningCount > 2 ||
+       (insertSize     = stringToNonnegInt(col[ISIZE_COL]))    <= 0)
       return NULL;
 
    StringVector patternCol;
@@ -239,7 +252,7 @@ static HitPattern *getPattern(const std::string& line, bool hasSpanningCol)
 
    StringVector annotation;
 
-   for (int i = isizeCol + 1; i < numCols; i++)
+   for (int i = FIRST_ANNOT_COL; i < numCols; i++)
       annotation.push_back(col[i]);
 
    return new HitPattern(name, sequence, annotation, matchingBases, possible,
@@ -259,21 +272,20 @@ static bool isReadLine(const std::string& line)
 // getRead() returns a pointer to a newly-allocated HitRead describing the read
 // identified by the given line, or returns NULL if the input is invalid
 
-static HitRead *getRead(const std::string& line, bool hasSpanningCol)
+static HitRead *getRead(const std::string& line)
 {
    StringVector col;
    int numCols = splitString(line, col);
 
-   int expectedCols = (hasSpanningCol ? SPANNING_COL + 1 : PERCENT_COL + 1);
+   int matchingBases, possible, spanningCount, leftOverlap, rightOverlap;
 
-   int matchingBases, possible, spanningCount = 0;
-
-   if (!isReadLine(line) || numCols != expectedCols ||
+   if (!isReadLine(line) || numCols <= OVRIGHT_COL ||
        (matchingBases  = stringToNonnegInt(col[MBASES_COL]))   <  0 ||
        (possible       = stringToNonnegInt(col[POSSIBLE_COL])) <= 0 ||
-       hasSpanningCol &&
-       ((spanningCount = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
-	spanningCount > 1))
+       (spanningCount  = stringToNonnegInt(col[SPANNING_COL])) <  0 ||
+       spanningCount > 1 ||
+       (leftOverlap    = stringToNonnegInt(col[OVLEFT_COL]))   <  0 ||
+       (rightOverlap   = stringToNonnegInt(col[OVRIGHT_COL]))  <  0)
       return NULL;
 
    bool isSpanning = (spanningCount == 1);
@@ -293,7 +305,7 @@ static HitRead *getRead(const std::string& line, bool hasSpanningCol)
    std::string trimmedSequence = sequence.substr(leadingBlanks);
 
    return new HitRead(name, leadingBlanks, trimmedSequence, matchingBases,
-                      isSpanning);
+                      isSpanning, leftOverlap, rightOverlap);
 }
 
 //------------------------------------------------------------------------------------
@@ -301,19 +313,16 @@ static HitRead *getRead(const std::string& line, bool hasSpanningCol)
 // by the given line (the pattern) and the next two lines (the read pair), or returns
 // NULL if the input is invalid
 
-static Hit *getHit(std::istream& istream, const std::string& patternLine,
-                   bool hasSpanningCol)
+static Hit *getHit(std::istream& istream, const std::string& patternLine)
 {
    HitPattern *hitPattern = NULL;
    HitRead    *hitRead1   = NULL, *hitRead2;
 
    std::string readLine1, readLine2;
 
-   if ((hitPattern = getPattern(patternLine, hasSpanningCol)) &&
-       getline(istream, readLine1) &&
-       (hitRead1 = getRead(readLine1, hasSpanningCol)) &&
-       getline(istream, readLine2) &&
-       (hitRead2 = getRead(readLine2, hasSpanningCol)))
+   if ((hitPattern = getPattern(patternLine)) &&
+       getline(istream, readLine1) && (hitRead1 = getRead(readLine1)) &&
+       getline(istream, readLine2) && (hitRead2 = getRead(readLine2)))
       return new Hit(hitPattern, hitRead1, hitRead2);
 
    delete hitPattern;
@@ -386,12 +395,11 @@ uint64_t readHits(std::istream& istream, std::string& version,
 {
    uint64_t totalReadPairs = 0;
    std::string headingLine, line;
-   bool hasSpanningCol;
 
    if (!getline(istream, headingLine))
       throw std::runtime_error("no input");
 
-   if (!isValidHeadingLine(headingLine, hasSpanningCol, version, annotationHeading))
+   if (!isValidHeadingLine(headingLine, version, annotationHeading))
       throw std::runtime_error("unexpected heading line");
 
    while (getline(istream, line))
@@ -411,7 +419,7 @@ uint64_t readHits(std::istream& istream, std::string& version,
       }
       else // this must be the first of three lines describing a hit
       {
-         Hit *hit = getHit(istream, line, hasSpanningCol);
+         Hit *hit = getHit(istream, line);
 
 	 if (hit)
             if (hitVector.size() < MAX_HITS)

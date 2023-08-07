@@ -48,6 +48,112 @@ struct MatchCompare // for sorting a MatchVector
 };
 
 //------------------------------------------------------------------------------------
+// lengthOfLCS() returns the length of a longest common subsequence of substrings of
+// two strings; it is a measure of similarity of these substrings
+
+static int lengthOfLCS(const std::string& strA, int offsetA, int lenA,
+		       const std::string& strB, int offsetB, int lenB)
+{
+   if (lenA <= 0 || lenB <= 0)
+      return 0;
+
+   const char *cstrA = strA.c_str();
+   const char *cstrB = strB.c_str();
+
+   const char *a = &cstrA[offsetA];
+   const char *b = &cstrB[offsetB];
+
+   int *previous = new int[lenB + 1]();
+   int *current  = new int[lenB + 1]();
+
+   for (int i = 0; i < lenA; i++)
+   {
+      for (int j = 0; j < lenB; j++)
+         if (a[i] == b[j])
+            current[j + 1] = previous[j] + 1;
+         else
+            current[j + 1] = std::max(current[j], previous[j + 1]);
+
+      int *temp = previous;
+      previous  = current;
+      current   = temp;
+   }
+
+   int matches = previous[lenB];
+
+   delete[] previous;
+   delete[] current;
+
+   return matches;
+}
+
+//------------------------------------------------------------------------------------
+// computeMinMatches() returns the minimum number of matching bases for the given
+// sequence length
+
+static int computeMinMatches(int seqlen, double minBases)
+{
+   return std::ceil((minBases / 100) * seqlen);
+}
+
+//------------------------------------------------------------------------------------
+// Candidate::setLeftRight() determines the number of overlapping and matching bases
+// on the left and right sides
+
+void Candidate::setLeftRight(const std::string& sequence,
+                             const PatternVector *patternVector)
+{
+   if (matchingBases == 0) // this is an unmatched mate
+      return;
+
+   const Pattern&     pattern   = (*patternVector)[index];
+   const std::string& psequence = pattern.sequence;
+
+   int pseqlen = psequence.length();
+   int extent  = offset + length;
+
+   if (extent <= pattern.leftBases) // full overlap of left side
+   {
+      leftOverlap  = length;
+      leftMatching = matchingBases;
+      return;
+   }
+
+   if (offset < pattern.leftBases)  // partial overlap of left side
+   {
+      leftOverlap  = pattern.leftBases - offset;
+      leftMatching = lengthOfLCS(sequence, 0, leftOverlap,
+                                 psequence, offset, leftOverlap);
+   }
+   else; // no overlap of left side
+
+   if (extent > pseqlen - pattern.rightBases)
+   {
+      int leftOfRight  = std::max(0, pseqlen - pattern.rightBases - offset);
+      int rightOfRight = std::max(0, extent - pseqlen);
+
+      rightOverlap = length - leftOfRight - rightOfRight;
+
+      if (rightOverlap == length)   // full overlap of right side
+         rightMatching = matchingBases;
+      else                          // partial overlap of right side
+         rightMatching = lengthOfLCS(sequence, leftOfRight, rightOverlap,
+                                     psequence, offset + leftOfRight, rightOverlap);
+   }
+   else; // no overlap of right side
+}
+
+//------------------------------------------------------------------------------------
+// Candidate::setJunctionSpanning() decides whether this is a juncton-spanning read
+
+void Candidate::setJunctionSpanning(double minBases, int minOverlap)
+{
+   junctionSpanning = (leftOverlap >= minOverlap && rightOverlap >= minOverlap &&
+                       leftMatching  >= computeMinMatches(leftOverlap,  minBases) &&
+                       rightMatching >= computeMinMatches(rightOverlap, minBases));
+}
+
+//------------------------------------------------------------------------------------
 // Match::possible() returns the maximum possible number of matching bases
 
 int Match::possible() const
@@ -86,55 +192,6 @@ int Match::insertSize() const
       return std::max(c1.length, c2.offset - c1.offset + c2.length);
    else                             // c2 is aligned ahead of c1
       return std::max(c2.length, c1.offset - c2.offset + c1.length);
-}
-
-//------------------------------------------------------------------------------------
-// computeMinMatches() returns the minimum number of matching bases for the given
-// sequence length
-
-static int computeMinMatches(int seqlen, double minBases)
-{
-   return std::ceil((minBases / 100) * seqlen);
-}
-
-//------------------------------------------------------------------------------------
-// lengthOfLCS() returns the length of a longest common subsequence of substrings of
-// two strings; it is a measure of similarity of these substrings
-
-static int lengthOfLCS(const std::string& strA, int offsetA, int lenA,
-		       const std::string& strB, int offsetB, int lenB)
-{
-   if (lenA <= 0 || lenB <= 0)
-      return 0;
-
-   const char *cstrA = strA.c_str();
-   const char *cstrB = strB.c_str();
-
-   const char *a = &cstrA[offsetA];
-   const char *b = &cstrB[offsetB];
-
-   int *previous = new int[lenB + 1]();
-   int *current  = new int[lenB + 1]();
-
-   for (int i = 0; i < lenA; i++)
-   {
-      for (int j = 0; j < lenB; j++)
-         if (a[i] == b[j])
-            current[j + 1] = previous[j] + 1;
-         else
-            current[j + 1] = std::max(current[j], previous[j + 1]);
-
-      int *temp = previous;
-      previous  = current;
-      current   = temp;
-   }
-
-   int matches = previous[lenB];
-
-   delete[] previous;
-   delete[] current;
-
-   return matches;
 }
 
 //------------------------------------------------------------------------------------
@@ -224,6 +281,9 @@ static void getCandidates(const std::string& sequence,
       const std::string& psequence = (*patternVector)[location.index].sequence;
 
       int pseqlen = psequence.length();
+
+      // this handles the unlikely possibility that the alignment of the read to
+      // the pattern extends beyond the right end of the pattern
       int pcmplen = std::min(seqlen, pseqlen - location.offset);
 
       int matchingBases = lengthOfLCS(sequence, 0, seqlen,
@@ -388,55 +448,6 @@ void getMatches(const std::string& sequence1, const std::string& sequence2,
 }
 
 //------------------------------------------------------------------------------------
-// overlapLeft() returns true if the given sequence aligned at the specified offset
-// overlaps the left side of the pattern
-
-static bool overlapLeft(const std::string& sequence, const Pattern& pattern,
-                        int offset, double minBases, int minOverlap)
-{
-   int maxPatternLen = pattern.sequence.length() - offset;
-   int patternLen    = std::min((int)sequence.length(), maxPatternLen);
-   int overlapBases  = std::min(patternLen, pattern.leftBases - offset);
-
-   if (overlapBases < minOverlap)
-      return false; // insufficient number of overlapping bases
-
-   if (overlapBases == patternLen)
-      return true;  // full overlap; we have already verified agreement of bases
-
-   // verify agreement of bases for partial overlap
-   int lcslen =
-      lengthOfLCS(sequence, 0, overlapBases, pattern.sequence, offset, overlapBases);
-
-   return (lcslen >= computeMinMatches(overlapBases, minBases));
-}
-
-//------------------------------------------------------------------------------------
-// overlapRight() returns true if the given sequence aligned at the specified offset
-// overlaps the right side of the pattern
-
-static bool overlapRight(const std::string& sequence, const Pattern& pattern,
-                         int offset, double minBases, int minOverlap)
-{
-   int maxPatternLen = pattern.sequence.length() - offset;
-   int patternLen    = std::min((int)sequence.length(), maxPatternLen);
-   int overlapBases  = patternLen + std::min(0, pattern.rightBases - maxPatternLen);
-
-   if (overlapBases < minOverlap)
-      return false; // insufficient number of overlapping bases
-
-   if (overlapBases == patternLen)
-      return true;  // full overlap; we have already verified agreement of bases
-
-   // verify agreement of bases for partial overlap
-   int lcslen =
-      lengthOfLCS(sequence, sequence.length() - overlapBases, overlapBases,
-                  pattern.sequence, offset + patternLen - overlapBases, overlapBases);
-
-   return (lcslen >= computeMinMatches(overlapBases, minBases));
-}
-
-//------------------------------------------------------------------------------------
 // Match::validOverlaps() returns true if the given match satisfies the overlap
 // requirements
 
@@ -444,31 +455,28 @@ bool Match::validOverlaps(const std::string& sequence1, const std::string& seque
                           const PatternVector *patternVector, double minBases,
                           int minOverlap)
 {
-   const Pattern& pattern = (*patternVector)[c1.index];
+   c1.setLeftRight(sequence1, patternVector);
+   c2.setLeftRight(sequence2, patternVector);
 
-   bool left1 = false, right1 = false;
-   bool left2 = false, right2 = false;
+   // must have sufficient overlap on the left side and on the right side
+   if (std::max(c1.leftOverlap,  c2.leftOverlap)  < minOverlap ||
+       std::max(c1.rightOverlap, c2.rightOverlap) < minOverlap)
+      return false;
 
-   if (c1.matchingBases > 0)
-   {
-      left1  = overlapLeft (sequence1, pattern, c1.offset, minBases, minOverlap);
-      right1 = overlapRight(sequence1, pattern, c1.offset, minBases, minOverlap);
-   }
+   // must have sufficient agreement on the left side and on the right side
+   if (c1.leftMatching + c2.leftMatching <
+       computeMinMatches(c1.leftOverlap + c2.leftOverlap, minBases) ||
+       c1.rightMatching + c2.rightMatching <
+       computeMinMatches(c1.rightOverlap + c2.rightOverlap, minBases))
+      return false;
 
-   if (c2.matchingBases > 0)
-   {
-      left2  = overlapLeft (sequence2, pattern, c2.offset, minBases, minOverlap);
-      right2 = overlapRight(sequence2, pattern, c2.offset, minBases, minOverlap);
-   }
+   c1.setJunctionSpanning(minBases, minOverlap);
+   c2.setJunctionSpanning(minBases, minOverlap);
 
-   c1.junctionSpanning = (left1 && right1);
-   c2.junctionSpanning = (left2 && right2);
+   // when matched to an ITD pattern, at least one read must span the junction
+   if ((*patternVector)[c1.index].hasBraces &&
+       !c1.junctionSpanning && !c2.junctionSpanning)
+      return false;
 
-   if (c1.junctionSpanning || c2.junctionSpanning)
-      return true;
-
-   if (pattern.hasBraces)
-      return false; // a junction-spanning read is required in this case
-
-   return (left1 && right2 || left2 && right1);
+   return true;
 }

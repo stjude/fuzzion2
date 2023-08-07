@@ -306,12 +306,14 @@ void writeMatch(const std::string& name1, const std::string& sequence1,
 		     match.insertSize());
 
    HitRead *hitRead1 =
-      new HitRead(name1, leading1, sequence1, match.c1.matchingBases,
-                  match.c1.junctionSpanning);
+      new HitRead(name1, leading1, sequence1,
+                  match.c1.matchingBases, match.c1.junctionSpanning,
+		  match.c1.leftOverlap, match.c1.rightOverlap);
 
    HitRead *hitRead2 =
-      new HitRead(name2, leading2, sequence2, match.c2.matchingBases,
-                  match.c2.junctionSpanning);
+      new HitRead(name2, leading2, sequence2,
+                  match.c2.matchingBases, match.c2.junctionSpanning,
+		  match.c2.leftOverlap, match.c2.rightOverlap);
 
    Hit hit(hitPattern, hitRead1, hitRead2);
    hit.write();
