@@ -172,7 +172,8 @@ Usage: fuzzort < fuzzion2_hits > sorted_hits
 
 Run `fuzzion2html` to produce an HTML file that provides an attractive display
 of hits when opened in a browser such as Google Chrome or Microsoft Edge.
-SNPs, indels, and sequencing errors are highlighted in the display.
+SNPs, indels, and sequencing errors are highlighted in the display.  An example
+can be seen [here](https://htmlpreview.github.io/?https://github.com/stjude/fuzzion2/blob/master/test/SJBALL020765_D1_by_pattern.html).
 
 ```
 Usage: fuzzion2html OPTION ... < fuzzion2_hits > html
@@ -216,7 +217,8 @@ are divided into two types: "strong+" if at least one read is junction spanning,
 In the leftmost column of a display of hits produced by `fuzzion2html`, each hit is
 labeled as either "weak," "strong-", or "strong+", or as "dup" if the read pair is a
 duplicate of another hit.  Furthermore, each read is marked as "+" if it qualifies as
-junction spanning and "-" if it does not.
+junction spanning and "-" if it does not.  As used here, "+" and "-" do not indicate
+orientation.
 
 In `fuzzall` output, each sample ID is followed by two numbers in parentheses,
 e.g., (24/22), indicating the number of distinct matches (24) and "strong+" matches (22).
@@ -310,7 +312,7 @@ Coming soon.
 
 ## COPYRIGHT
 
-Copyright 2023 St. Jude Children's Research Hospital
+Copyright 2025 St. Jude Children's Research Hospital
 
 ## LICENSE
 
