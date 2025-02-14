@@ -308,7 +308,8 @@ in progress.
 
 #### Programs for Creating Pattern Files
 
-Coming soon.
+Programs to generate pattern files from either fusion/ITD contig sequences or genomic
+breakpoints are available here: [`https://github.com/stjude/fuzzion2_patgen/`](https://github.com/stjude/fuzzion2_patgen/).
 
 ## COPYRIGHT
 
