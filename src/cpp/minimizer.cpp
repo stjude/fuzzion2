@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -15,8 +15,9 @@
 // MinimizerFinder::MinimizerFinder() checks for a valid window length and initializes
 // data members
 
-MinimizerFinder::MinimizerFinder(const char *sequence, int sequenceLen,
-		                 KmerLength kmerLen, MinimizerWindowLength windowLen)
+MinimizerFinder::MinimizerFinder(const char *sequence, const int sequenceLen,
+		                 const KmerLength kmerLen,
+                                 const MinimizerWindowLength windowLen)
    : KmerFinder(sequence, sequenceLen, kmerLen), w(windowLen), currentWindowID(-1),
      currentMinimizer(0), currentStartIndex(-1)
 {
@@ -39,11 +40,10 @@ void MinimizerFinder::find()
 // MinimizerFinder::reportKmer() examines each k-mer found in the sequence;
 // minimizers are constructed and reported
 
-bool MinimizerFinder::reportKmer(Kmer kmer, int startIndex)
+bool MinimizerFinder::reportKmer(const Kmer kmer, const int startIndex)
 {
-   KmerHash kmerHash = hash(kmer);
-
-   int windowID = minimizerWindowID(startIndex, w);
+   const KmerHash kmerHash = hash(kmer);
+   const int windowID = minimizerWindowID(startIndex, w);
 
    if (windowID == currentWindowID)
    {
@@ -56,9 +56,8 @@ bool MinimizerFinder::reportKmer(Kmer kmer, int startIndex)
    else // this is the first k-mer of a new window
    {
       // report minimizer for the previous window
-      if (currentWindowID >= 0 &&
-          !reportMinimizer(currentMinimizer, currentStartIndex, currentWindowID,
-                           false))
+      if (currentWindowID >= 0 && !reportMinimizer(currentMinimizer,
+                                   currentStartIndex, currentWindowID, false))
       {
          // discontinue the search
 	 currentWindowID = -1;

@@ -4,14 +4,14 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #ifndef KMER_H
 #define KMER_H
 
-#include <string>
+#include "util.h"
 
 typedef uint8_t Base;
 
@@ -30,15 +30,15 @@ typedef uint8_t  KmerLength; // holds the length of a k-mer, i.e., the value of 
 
 const KmerLength MAX_KMER_LENGTH = 15; // maximum supported length of a k-mer
 
-inline Kmer numKmers(KmerLength k)
+inline Kmer numKmers(const KmerLength k)
 { return (k <= MAX_KMER_LENGTH ? 1 << (2 * k) : 0); }
 
 //------------------------------------------------------------------------------------
 
-inline char baseToChar(Base base)
+inline char baseToChar(const Base base)
 { return (base < NUM_BASES ? BASE_CHAR[base] : UNDEFINED_BASE); }
 
-inline Base charToBase(char ch)
+inline Base charToBase(const char ch)
 {
    switch (ch)
    {
@@ -52,25 +52,33 @@ inline Base charToBase(char ch)
 
 //------------------------------------------------------------------------------------
 
-inline Base baseComplement(Base base)
-{ return (base < NUM_BASES ? 3 - base : BASE_OTHER); }
-
-inline char charComplement(char ch)
-{ return baseToChar(baseComplement(charToBase(ch))); }
+inline char upperACGT(const char ch)
+{
+   switch (ch)
+   {
+      case 'a': case 'c': case 'g': case 't':
+         return ch + 'A' - 'a';
+      default:
+         return ch;
+   }
+}
 
 //------------------------------------------------------------------------------------
 
-std::string kmerToString(KmerLength k, Kmer kmer);
+inline Base baseComplement(const Base base)
+{ return (base < NUM_BASES ? 3 - base : BASE_OTHER); }
 
-Kmer stringToKmer(const std::string& s);
+//------------------------------------------------------------------------------------
+
+String kmerToString(KmerLength k, Kmer kmer);
+
+Kmer stringToKmer(const String& s);
 
 //------------------------------------------------------------------------------------
 
 Kmer kmerReverseComplement(KmerLength k, Kmer kmer);
 
-char *charReverseComplement(const char *s, int slen);
-
-std::string stringReverseComplement(const std::string& s);
+String stringReverseComplement(const String& s);
 
 //------------------------------------------------------------------------------------
 
@@ -87,10 +95,10 @@ public:
    // return true to continue, false to discontinue the search
    virtual bool reportKmer(Kmer kmer, int startIndex) = 0;
 
-   const char *seq; // sequence to search
-   int seqlen;      // length of the sequence
-   KmerLength k;    // length of k-mers to find
-   Kmer mask;       // mask used internally
+   const char *seq;    // sequence to search
+   const int seqlen;   // length of the sequence
+   const KmerLength k; // length of k-mers to find
+   const Kmer mask;    // mask used internally
 };
 
 //------------------------------------------------------------------------------------

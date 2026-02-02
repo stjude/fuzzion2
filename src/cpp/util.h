@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,31 +14,34 @@
 #include <string>
 #include <vector>
 
-inline int roundit(double d) { return static_cast<int>(d + 0.5); }
-
 typedef std::vector<bool> BoolVector;
 typedef std::vector<int>  IntVector;
-typedef std::vector<std::string> StringVector;
+
+typedef std::string String;
+typedef std::vector<String> StringVector;
 
 const char TAB     = '\t';
 const char NEWLINE = '\n';
 const char CRETURN = '\r';
 
-bool getline(std::istream& stream, std::string& line);
-int  splitString(const std::string& s, StringVector& v, char delimiter=TAB);
+bool getline(std::istream& stream, String& line);
+int  splitString(const String& s, StringVector& v, char delimiter=TAB);
 
-int    stringToNonnegInt(const std::string& s);
-double stringToNonnegDouble(const std::string& s);
+int    stringToInt(const String& s);
+double stringToDouble(const String& s);
 
-bool stringOpt(const StringVector& opt, std::string optname, std::string& optvalue);
-bool intOpt   (const StringVector& opt, std::string optname, int& optvalue);
-bool doubleOpt(const StringVector& opt, std::string optname, double& optvalue);
+bool stringOpt(const StringVector& opt, const String& optname, String& optvalue);
+bool intOpt   (const StringVector& opt, const String& optname, int& optvalue);
+bool doubleOpt(const StringVector& opt, const String& optname, double& optvalue);
 
-std::string intToString(int i);
-std::string doubleToString(double d);
+String intToString(int i);
+String doubleToString(double d);
 
-std::string intToStringLeadingZeros(int i, int width);
+bool hasPrefix(const String& s, const String& prefix);
 
-bool hasPrefix(const std::string& s, const std::string& prefix);
+void logOpen(const String& filename);
+bool logging();
+void logWrite(const String& message);
+void logClose();
 
 #endif

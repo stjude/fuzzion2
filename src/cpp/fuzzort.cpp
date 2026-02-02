@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,7 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_NAME = "fuzzort " + CURRENT_VERSION;
+const String VERSION_NAME = "fuzzort " + CURRENT_VERSION;
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -29,7 +29,7 @@ void showUsage(const char *progname)
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (argc > 1)
    {
@@ -39,21 +39,21 @@ int main(int argc, char *argv[])
 
    try
    {
-      std::string fuzzion2Version;
+      String       fuzzion2Version;
       StringVector annotationHeading;
-      HitVector hitVector;
+      HitVector    hitVector;
+      uint64_t     numReads;
 
-      uint64_t numReadPairs = readHits(std::cin, fuzzion2Version, annotationHeading,
-                                       hitVector);
+      readHits(std::cin, fuzzion2Version, annotationHeading, hitVector, numReads);
 
-      writeHitHeadingLine(fuzzion2Version, annotationHeading);
+      writeHitHeadingLine(std::cout, fuzzion2Version, annotationHeading);
 
-      int numHits = hitVector.size();
+      const int numHits = hitVector.size();
 
       for (int i = 0; i < numHits; i++)
-         hitVector[i]->write();
+         hitVector[i]->write(std::cout);
 
-      writeReadPairLine(numReadPairs);
+      writeReadCountLine(std::cout, numReads);
    }
    catch (const std::runtime_error& error)
    {

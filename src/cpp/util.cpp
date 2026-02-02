@@ -4,26 +4,31 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "util.h"
-#include <iomanip>
+#include <fstream>
 #include <limits>
+#include <mutex>
 #include <sstream>
+#include <stdexcept>
+
+std::ofstream *logfile = nullptr; // is non-null when the log file is open
+std::mutex     logMutex; // enforces mutual exclusion when writing to log file
 
 //------------------------------------------------------------------------------------
 // getline() reads the next line from the input stream and returns true, or returns
 // false if end-of-file was encountered
 
-bool getline(std::istream& stream, std::string& line)
+bool getline(std::istream& stream, String& line)
 {
    if (!std::getline(stream, line))
       return false;
 
    // check for Windows line ending
-   int len = line.length();
+   const int len = line.length();
    if (len > 0 && line[len - 1] == CRETURN)
       line = line.substr(0, len - 1); // remove trailing carriage return
 
@@ -35,7 +40,7 @@ bool getline(std::istream& stream, std::string& line)
 // saves the component strings as elements of a vector; the number of component
 // strings is returned and is equal to the number of delimiters in the string plus one
 
-int splitString(const std::string& s, StringVector& v, char delimiter)
+int splitString(const String& s, StringVector& v, const char delimiter)
 {
    v.clear();
 
@@ -65,14 +70,14 @@ int splitString(const std::string& s, StringVector& v, char delimiter)
 }
 
 //------------------------------------------------------------------------------------
-// stringToNonnegInt() converts a string to a nonnegative integer; -1 is returned if
-// the conversion cannot be performed
+// stringToInt() converts a string to a nonnegative integer; -1 is returned if the
+// conversion cannot be performed
 
-int stringToNonnegInt(const std::string& s)
+int stringToInt(const String& s)
 {
    const char *str = s.c_str();
 
-   uint64_t maxint = std::numeric_limits<int>::max();
+   const uint64_t MAXINT = std::numeric_limits<int>::max();
    uint64_t value  = 0;
 
    int  i = 0;
@@ -82,7 +87,7 @@ int stringToNonnegInt(const std::string& s)
    {
       value = 10 * value + c - '0';
 
-      if (value > maxint) // integer too large
+      if (value > MAXINT) // integer too large
          return -1;
 
       c = str[++i];
@@ -92,10 +97,10 @@ int stringToNonnegInt(const std::string& s)
 }
 
 //------------------------------------------------------------------------------------
-// stringToNonnegDouble() converts a string to a nonnegative double; -1 is returned if
-// the conversion cannot be performed
+// stringToDouble() converts a string to a nonnegative double; -1.0 is returned if the
+// conversion cannot be performed
 
-double stringToNonnegDouble(const std::string& s)
+double stringToDouble(const String& s)
 {
    double value = -1.0;
 
@@ -109,7 +114,7 @@ double stringToNonnegDouble(const std::string& s)
 // stringOpt() returns true if opt contains the named option and the option value is
 // provided as a string
 
-bool stringOpt(const StringVector& opt, std::string optname, std::string& optvalue)
+bool stringOpt(const StringVector& opt, const String& optname, String& optvalue)
 {
    if (opt[0] == "-" + optname)
    {
@@ -124,11 +129,11 @@ bool stringOpt(const StringVector& opt, std::string optname, std::string& optval
 // intOpt() returns true if opt contains the named option and the option value is
 // provided as an integer
 
-bool intOpt(const StringVector& opt, std::string optname, int& optvalue)
+bool intOpt(const StringVector& opt, const String& optname, int& optvalue)
 {
    if (opt[0] == "-" + optname)
    {
-      optvalue = stringToNonnegInt(opt[1]);
+      optvalue = stringToInt(opt[1]);
       return true;
    }
    else
@@ -139,11 +144,11 @@ bool intOpt(const StringVector& opt, std::string optname, int& optvalue)
 // doubleOpt() returns true if opt contains the named option and the option value is
 // provided as a double
 
-bool doubleOpt(const StringVector& opt, std::string optname, double& optvalue)
+bool doubleOpt(const StringVector& opt, const String& optname, double& optvalue)
 {
    if (opt[0] == "-" + optname)
    {
-      optvalue = stringToNonnegDouble(opt[1]);
+      optvalue = stringToDouble(opt[1]);
       return true;
    }
    else
@@ -153,7 +158,7 @@ bool doubleOpt(const StringVector& opt, std::string optname, double& optvalue)
 //------------------------------------------------------------------------------------
 // intToString() returns a string representation of the given integer
 
-std::string intToString(int i)
+String intToString(const int i)
 {
    char buffer[100];
 
@@ -165,7 +170,7 @@ std::string intToString(int i)
 //------------------------------------------------------------------------------------
 // doubleToString() returns a string representation of the given double
 
-std::string doubleToString(double d)
+String doubleToString(const double d)
 {
    char buffer[100];
 
@@ -175,26 +180,61 @@ std::string doubleToString(double d)
 }
 
 //------------------------------------------------------------------------------------
-// intToStringLeadingZeros() returns a string representation of the given integer of
-// the specified width, with leading zeros
-
-std::string intToStringLeadingZeros(int i, int width)
-{
-   std::ostringstream stream;
-   stream << std::setfill('0') << std::setw(width) << i;
-
-   return stream.str();
-}
-
-//------------------------------------------------------------------------------------
 // hasPrefix() returns true if the given string has the given prefix
 
-bool hasPrefix(const std::string& s, const std::string& prefix)
+bool hasPrefix(const String& s, const String& prefix)
 {
-   int prefixLen = prefix.length();
+   const int prefixLen = prefix.length();
 
    if (s.length() < prefixLen)
       return false;
 
    return (s.substr(0, prefixLen) == prefix);
+}
+
+//------------------------------------------------------------------------------------
+// logOpen() opens the named log file
+
+void logOpen(const String& filename)
+{
+   if (logfile)
+      logClose();
+
+   logfile = new std::ofstream(filename.c_str());
+   if (!logfile->is_open())
+      throw std::runtime_error("unable to open " + filename);
+}
+
+//------------------------------------------------------------------------------------
+// logging() returns true if the log file is open
+
+bool logging()
+{
+   return (logfile ? true : false);
+}
+
+//------------------------------------------------------------------------------------
+// logWrite() writes a message to the log file
+
+void logWrite(const String& message)
+{
+   if (!logfile) // log file is not open
+      return;
+
+   logMutex.lock();
+   *logfile << message;
+   logMutex.unlock();
+}
+
+//------------------------------------------------------------------------------------
+// logClose() closes the log file
+
+void logClose()
+{
+   if (logfile)
+   {
+      logfile->close();
+      delete logfile;
+      logfile = nullptr;
+   }
 }

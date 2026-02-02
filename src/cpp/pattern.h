@@ -1,75 +1,113 @@
 //------------------------------------------------------------------------------------
 //
-// pattern.h - module supporting pattern sequences
+// pattern.h - module supporting patterns
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
+//------------------------------------------------------------------------------------
+// Six types of patterns are supported:
+//
+// Description                  Form       left  middle  right  xvector
+// --------------------    --------------  ----  ------  -----  -------
+// sequence w/o delims        sequence      yes    no     no      no
+//
+// fusion with middle      left]mid[right   yes    yes    yes     no
+//    ITD with middle      left}mid{right   yes    yes    yes     no
+//
+// fusion with wildcard     left]*[right    yes    no     yes     no
+//    ITD with wildcard     left}*{right    yes    no     yes     no
+//
+// hotspot with exclusion  left(ex)right    yes    no     yes     yes
 //------------------------------------------------------------------------------------
 
 #ifndef PATTERN_H
 #define PATTERN_H
 
 #include "minimizer.h"
-#include "util.h"
+#include <array>
 #include <unordered_map>
+
+const KmerLength TRIMER_LEN  =  3; // k = 3
+const int        NUM_TRIMERS = 64; // there are 64 3-mers
+
+typedef std::array<IntVector, NUM_TRIMERS> TrimerOffsets;
+
+void initTrimerOffsets(const char *cstr, int begin, int len,
+                       TrimerOffsets& trimerOffsets);
+
+//------------------------------------------------------------------------------------
+
+class Seq
+{
+public:
+   Seq(const String& inStr, bool& invalidBase);
+   Seq(const Seq& other);
+
+   virtual ~Seq() { delete[] cstr; }
+
+   String  str;   // original string
+   char   *cstr;  // C-style string with all-uppercase ACGT used in comparisons
+   const int len; // string length >= 0
+};
+
+typedef std::vector<Seq> SeqVector;
 
 //------------------------------------------------------------------------------------
 
 class Pattern
 {
 public:
-   Pattern(const std::string& inName, const std::string& inSequence,
+   Pattern(const String& inName, const String& inSequence,
            const StringVector& inAnnotation);
 
-   virtual ~Pattern() { }
+   virtual ~Pattern() { delete left; delete middle; delete right; delete xvector; }
 
-   std::string name;            // pattern name
-   std::string sequence;        // sequence w/o brackets or braces
-   std::string displaySequence; // sequence w/  brackets or braces
+   const String name;             // unique pattern name
+   const String sequence;         // full sequence with delimiters
+   const StringVector annotation; // vector of annotations (possibly empty)
 
-   bool hasBraces;              // false = brackets: left]mid[right
-                                // true  = braces  : left}mid{right
-   int  delim2;                 // offset of second delimiter: [ or {
-   int  leftBases;              // #bases in left side of sequence
-   int  middleBases;            // #bases between delimiters
-   int  rightBases;             // #bases in right side of sequence
+   int delim1, delim2;            // offsets of delimiters in sequence (-1 if N/A)
 
-   StringVector annotation;     // zero or more annotations
+   Seq *left;                     // left or unsided sequence (always non-null)
+   Seq *middle;                   // middle sequence          (nullptr if N/A)
+   Seq *right;                    // right sequence           (nullptr if N/A)
+
+   SeqVector *xvector;            // excluded sequences       (nullptr if N/A)
+   String xvis;                   // visualization of excluded sequences
+
+   TrimerOffsets leftTrimers, rightTrimers; // offsets of 3-mers in left & right
 };
 
-typedef std::vector<Pattern> PatternVector;
+typedef std::vector<Pattern *> PatternVector;
 
 //------------------------------------------------------------------------------------
 
-class Location // indicates a location within a pattern sequence
+class Ploc // a location in a pattern sequence
 {
 public:
-   Location(int inIndex, int inOffset)
-      : index(inIndex), offset(inOffset) { }
+   Ploc(const int inPindex, const int inPoffset)
+      : pindex(inPindex), poffset(inPoffset) { }
 
-   virtual ~Location() { }
+   virtual ~Ploc() { }
 
-   int index;  // index of pattern in a PatternVector
-   int offset; // offset within the pattern sequence
+   const int pindex;  // index of pattern in PatternVector
+   const int poffset; // offset in pattern's left/unsided or right sequence
 };
 
-typedef std::vector<Location> LocationVector;
+typedef std::vector<Ploc> PlocVector;
+typedef std::array<PlocVector, 2> PlocDuo; // index 0 is left/unsided; 1 is right
 
 // this maps a minimizer to locations of the minimizer in patterns
-typedef std::unordered_map<Minimizer, LocationVector> PatternMap;
+typedef std::unordered_map<Minimizer, PlocDuo> PatternMap;
 
 //------------------------------------------------------------------------------------
 
-bool hasDelimiters(const std::string& sequence, bool& hasBraces, int& delim2,
-                   int& leftBases, int& middleBases, int& rightBases);
+PatternVector *readPatterns(const String& filename, StringVector& annotationHeading);
 
-PatternVector *readPatterns(const std::string& filename,
-                            StringVector& annotationHeading);
-
-PatternMap *createPatternMap(const PatternVector *patternVector,
-                             MinimizerWindowLength w, const KmerRankTable *rankTable,
-			     Minimizer maxMinimizer);
+PatternMap *createPatternMap(PatternVector& pvector, MinimizerWindowLength w,
+                             const KmerRankTable *rankTable, Minimizer maxMinimizer,
+			     BoolVector *& inPatternMap);
 
 #endif

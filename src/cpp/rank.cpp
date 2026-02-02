@@ -4,16 +4,14 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "rank.h"
 #include "refgen.h"
-#include "util.h"
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 #include <stdexcept>
 
 const uint32_t RANK_FILE_SIGNATURE_NOSWAP = 0x17D26E39;
@@ -50,15 +48,15 @@ struct CompareKmerCounts // used to sort counts in ascending order
 class KmerFinderCounter : public KmerFinder // finds and counts k-mers
 {
 public:
-   KmerFinderCounter(const char *sequence, int sequenceLen, KmerLength kmerLen,
-                     KmerCountVector *countVector)
+   KmerFinderCounter(const char *sequence, const int sequenceLen,
+                     const KmerLength kmerLen, KmerCountVector *countVector)
       : KmerFinder(sequence, sequenceLen, kmerLen), cv(countVector) { }
 
    virtual ~KmerFinderCounter() { }
 
-   virtual bool reportKmer(Kmer kmer, int startIndex)
+   virtual bool reportKmer(const Kmer kmer, const int startIndex) override
    {
-      Kmer revcomp = kmerReverseComplement(k, kmer);
+      const Kmer revcomp = kmerReverseComplement(k, kmer);
 
       (*cv)[kmer].increment();
       (*cv)[revcomp].increment();
@@ -72,7 +70,7 @@ public:
 //------------------------------------------------------------------------------------
 // KmerRankTable::KmerRankTable() allocates but does not initialize the lookup table
 
-KmerRankTable::KmerRankTable(KmerLength kmerLen)
+KmerRankTable::KmerRankTable(const KmerLength kmerLen)
    : k(kmerLen)
 {
    if (k < 4 || k > MAX_KMER_LENGTH)
@@ -84,14 +82,14 @@ KmerRankTable::KmerRankTable(KmerLength kmerLen)
 //------------------------------------------------------------------------------------
 // KmerRankTable::writeText() writes a text file containing the k-mers and their ranks
 
-void KmerRankTable::writeText(const std::string& textFilename) const
+void KmerRankTable::writeText(const String& textFilename) const
 {
    std::ofstream outfile(textFilename.c_str());
 
    if (!outfile.is_open())
       throw std::runtime_error("unable to create " + textFilename);
 
-   Kmer n = numKmers(k);
+   const Kmer n = numKmers(k);
 
    for (Kmer kmer = 0; kmer < n; kmer++)
       outfile << kmerToString(k, kmer) << TAB << rank[kmer] << NEWLINE;
@@ -102,7 +100,7 @@ void KmerRankTable::writeText(const std::string& textFilename) const
 //------------------------------------------------------------------------------------
 // KmerRankTable::writeBinary() writes a binary rank file
 
-void KmerRankTable::writeBinary(const std::string& binaryFilename) const
+void KmerRankTable::writeBinary(const String& binaryFilename) const
 {
    BinWriter writer;
 
@@ -113,8 +111,8 @@ void KmerRankTable::writeBinary(const std::string& binaryFilename) const
 
    // write the lookup table in four equal-sized chunks
 
-   int quarter  = numKmers(k) >> 2;
-   int numBytes = quarter * sizeof(KmerRank);
+   const int quarter  = numKmers(k) >> 2;
+   const int numBytes = quarter * sizeof(KmerRank);
 
    for (int i = 0; i < 4; i++)
       writer.writeBuffer(&rank[i * quarter], numBytes);
@@ -126,7 +124,7 @@ void KmerRankTable::writeBinary(const std::string& binaryFilename) const
 // readRankTable() returns a lookup table containing the ranks read from a binary rank
 // file; it is the caller's obligation to de-allocate it
 
-KmerRankTable *readRankTable(const std::string& binaryFilename)
+KmerRankTable *readRankTable(const String& binaryFilename)
 {
    BinReader reader;
 
@@ -145,10 +143,10 @@ KmerRankTable *readRankTable(const std::string& binaryFilename)
 
    // initialize the lookup table in four equal-sized chunks
 
-   Kmer n = numKmers(k);
+   const Kmer n = numKmers(k);
 
-   int quarter  = n >> 2;
-   int numBytes = quarter * sizeof(KmerRank);
+   const int quarter  = n >> 2;
+   const int numBytes = quarter * sizeof(KmerRank);
 
    for (int i = 0; i < 4; i++)
       if (!reader.readBuffer(&table->rank[i * quarter], numBytes))
@@ -172,9 +170,9 @@ KmerRankTable *readRankTable(const std::string& binaryFilename)
 // createRankTable() returns a lookup table containing the ranks derived from a
 // reference genome; it is the caller's obligation to de-allocate it
 
-KmerRankTable *createRankTable(KmerLength k, const std::string& refGenFilename)
+KmerRankTable *createRankTable(const KmerLength k, const String& refGenFilename)
 {
-   Kmer n = numKmers(k);
+   const Kmer n = numKmers(k);
 
    KmerCountVector *cv = new KmerCountVector(n);
 
@@ -187,7 +185,7 @@ KmerRankTable *createRankTable(KmerLength k, const std::string& refGenFilename)
 
    for (int i = 0; i < reader.numref; i++) // for each reference
    {
-      RefGenSeq *rgs = reader.getRefGenSeq(reader.refName[i], 1, 1000000000);
+      const RefGenSeq *rgs = reader.getRefGenSeq(reader.refName[i], 1, 1000000000);
 
       KmerFinderCounter fc(rgs->seq, rgs->end, k, cv);
       fc.find();
@@ -208,49 +206,4 @@ KmerRankTable *createRankTable(KmerLength k, const std::string& refGenFilename)
    delete cv;
 
    return table;
-}
-
-//------------------------------------------------------------------------------------
-// KmerRankInverter::KmerRankInverter() allocates and initializes the lookup table
-
-KmerRankInverter::KmerRankInverter(const KmerRankTable *rankTable)
-   : k(rankTable->k)
-{
-   Kmer n = numKmers(k);
-
-   kmer = new Kmer[n];
-
-   for (Kmer i = 0; i < n; i++)
-      kmer[rankTable->rank[i]] = i;
-}
-
-//------------------------------------------------------------------------------------
-// KmerRankInverter::getKmers() gets the k-mer sequence and its reverse complement for
-// the given rank
-
-void KmerRankInverter::getKmers(const std::string& rank,
-                                std::string& kmer1, std::string& kmer2) const
-{
-   int ranklen = rank.length();
-
-   if (ranklen == 0)
-      throw std::runtime_error("empty rank string");
-
-   for (int i = 0; i < ranklen; i++)
-      if (!std::isdigit(rank[i]))
-         throw std::runtime_error("invalid rank string " + rank);
-
-   // convert rank to integer
-   std::istringstream stream(rank);
-   KmerRank  myRank;
-   stream >> myRank;
-
-   if (myRank >= numKmers(k))
-      throw std::runtime_error("invalid rank string " + rank);
-
-   Kmer myKmer1 = kmer[myRank];
-   Kmer myKmer2 = kmerReverseComplement(k, myKmer1);
-
-   kmer1 = kmerToString(k, myKmer1);
-   kmer2 = kmerToString(k, myKmer2);
 }

@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -15,17 +15,18 @@
 class Finder : public RankMinimizerFinder
 {
 public:
-   Finder(const std::string& sequence, MinimizerWindowLength w,
+   Finder(const char *sequence, const int sequenceLen, const MinimizerWindowLength w,
           const KmerRankTable *rankTable, WindowVector& inWindowVector)
-      : RankMinimizerFinder(sequence.c_str(), sequence.length(), w, rankTable),
+      : RankMinimizerFinder(sequence, sequenceLen, w, rankTable),
 	windowVector(inWindowVector) { }
 
    virtual ~Finder() { }
 
-   virtual bool reportMinimizer(Minimizer minimizer, int startIndex, int windowID,
-                                bool finalMinimizer)
+   virtual bool reportMinimizer(const Minimizer minimizer,
+                                const int startIndex, const int windowID,
+				const bool finalMinimizer) override
    {
-      windowVector.push_back(Window(minimizer, startIndex));
+      windowVector.emplace_back(minimizer, startIndex);
       return true;
    }
 
@@ -36,9 +37,10 @@ public:
 // getWindows() partitions a sequence into consecutive windows and stores them in a
 // vector
 
-void getWindows(const std::string& sequence, MinimizerWindowLength w,
-                const KmerRankTable *rankTable, WindowVector& windowVector)
+void getWindows(const char *sequence, const int sequenceLen,
+                const MinimizerWindowLength w, const KmerRankTable *rankTable,
+		WindowVector& windowVector)
 {
-   Finder finder(sequence, w, rankTable, windowVector);
+   Finder finder(sequence, sequenceLen, w, rankTable, windowVector);
    finder.find();
 }

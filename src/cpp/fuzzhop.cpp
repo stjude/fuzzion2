@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -16,32 +16,36 @@
 #include <map>
 #include <stdexcept>
 
-const std::string VERSION_NAME = "fuzzhop " + CURRENT_VERSION;
+const String VERSION_NAME = "fuzzhop " + CURRENT_VERSION;
+
+const int DEFAULT_BY_LANE = 1;
+int byLane    = DEFAULT_BY_LANE;    // setting of -bylane option
+int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
 StringVector fuzzion2Filename;
 int numFuzzion2Files;
 
 //------------------------------------------------------------------------------------
 
-typedef std::map<std::string, IntVector> FlowcellLaneMap; // flowcell lane,
-                                                          // #hits in each file
+// this maps flowcell or lane to the number of strong hits in each file
+typedef std::map<String, IntVector> FlowcellMap;
 
 class PatternHitCount
 {
 public:
-   PatternHitCount(const StringVector& inAnnotation, int numFiles)
+   PatternHitCount(const StringVector& inAnnotation, const int numFiles)
       : annotation(inAnnotation), hitCount(numFiles, 0), fmap() { }
 
    virtual ~PatternHitCount() { }
 
-   void addHit(const std::string& readName, int fileIndex);
+   void addStrongHit(const String& readName, int fileIndex);
 
-   StringVector annotation; // pattern annotations
-   IntVector hitCount;      // holds #hits of a pattern in each file
-   FlowcellLaneMap fmap;    // for each flowcell lane, holds #hits in each file
-};
+   const StringVector annotation; // pattern annotations
+   IntVector   hitCount;          // holds #strong hits of a pattern in each file
+   FlowcellMap fmap;              // for each flowcell or lane, #strong hits per file
+}; 
 
-typedef std::map<std::string, PatternHitCount> PatternHitMap; // key is pattern name
+typedef std::map<String, PatternHitCount> PatternHitMap; // key is pattern name
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -50,19 +54,29 @@ void showUsage(const char *progname)
 {
    std::cerr
       << VERSION_NAME << ", " << COPYRIGHT << NEWLINE << NEWLINE
-      << "Usage: " << progname
+      << "Usage: " << progname << " OPTION ..."
       << " fuzzion2_filename1 fuzzion2_filename2 ... > possible_index_hops"
       << NEWLINE;
+
+   std::cerr
+      << NEWLINE
+      << "The following are optional:" << NEWLINE
+      << "  -bylane=N   "
+             << "group by flowcell lane (1) or by flowcell (0), default is "
+	     << DEFAULT_BY_LANE << NEWLINE
+      << "  -strong=N   "
+             << "minimum overlap of a strong match in #bases,   default is "
+	     << DEFAULT_MIN_STRONG << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -72,83 +86,89 @@ bool parseArgs(int argc, char *argv[])
 	 continue;
       }
 
+      StringVector opt;
+
+      if (splitString(arg, opt, '=') != 2)
+         return false; // incorrect option format
+
+      if (intOpt(opt, "bylane", byLane) ||
+          intOpt(opt, "strong", minStrong))
+         continue;  // this option has been recognized
+
       return false; // unrecognized option
    }
 
    numFuzzion2Files = fuzzion2Filename.size();
 
-   return (numFuzzion2Files > 1);
+   return (numFuzzion2Files > 1 && (byLane == 0 || byLane == 1) &&
+           minStrong >= TRIMER_LEN);
 }
 
 //------------------------------------------------------------------------------------
-// getFlowcellLane() returns the flowcell lane that is embedded in the given read
-// name, or returns the empty string if the flowcell lane cannot be determined; it is
-// assumed that a read name contains a series of values separated by colons, and that
-// the flowcell and lane are identified by all but the last three values of the series
+// getFlowcell() returns the flowcell or lane that is embedded in the given read name,
+// or returns the empty string if it cannot be determined; we assume that a read name
+// follows Illumina conventions and contains a series of values separated by colons,
+// and that the flowcell and lane are identified by all but the last three values of
+// the series
 
-std::string getFlowcellLane(const std::string& readName)
+String getFlowcell(const String& readName)
 {
    StringVector part;
 
-   int numParts = splitString(readName, part, ':');
-   if (numParts < 4)
+   const int numParts = splitString(readName, part, ':');
+   const int numKeep  = numParts - (byLane ? 3 : 4);
+
+   if (numKeep < 1)
       return "";
 
-   int numKeep = numParts - 3;
-
-   std::string flowcellLane = part[0];
+   String flowcell = part[0];
 
    for (int i = 1; i < numKeep; i++)
-      flowcellLane += ":" + part[i];
+      flowcell += ":" + part[i];
 
-   return flowcellLane;
+   return flowcell;
 }
 
 //------------------------------------------------------------------------------------
-// PatternHitCount::addHit() increments the #hits for the file having the specified
-// index from 0 to (numFuzzion2Files - 1)
+// PatternHitCount::addStrongHit() increments the #strong hits for the file having the
+// specified index from 0 to (numFuzzion2Files - 1)
 
-void PatternHitCount::addHit(const std::string& readName, int fileIndex)
+void PatternHitCount::addStrongHit(const String& readName, const int fileIndex)
 {
-   std::string flowcellLane = getFlowcellLane(readName);
-   if (flowcellLane == "")
-      throw std::runtime_error("unable to obtain flowcell lane from read name " +
-                               readName + " in " + fuzzion2Filename[fileIndex]);
+   const String flowcell = getFlowcell(readName);
+   if (flowcell == "")
+      throw std::runtime_error("unable to obtain flowcell information from read name "
+                               + readName + " in " + fuzzion2Filename[fileIndex]);
 
    hitCount[fileIndex]++; // increment the overall hit count
 
-   // now increment the hit count for this flowcell and lane
+   // now increment the hit count for this flowcell
 
-   FlowcellLaneMap::iterator fpos = fmap.find(flowcellLane);
+   FlowcellMap::iterator fpos = fmap.find(flowcell);
    if (fpos == fmap.end())
-   {
-      fmap.insert(std::make_pair(flowcellLane, IntVector(numFuzzion2Files, 0)));
-      fpos = fmap.find(flowcellLane);
-   }
+      fpos = fmap.insert(
+          std::make_pair(flowcell, IntVector(numFuzzion2Files, 0))).first;
 
-   IntVector& flowcellLaneCount = fpos->second;
-   flowcellLaneCount[fileIndex]++;
+   IntVector& flowcellCount = fpos->second;
+   flowcellCount[fileIndex]++;
 }
 
 //------------------------------------------------------------------------------------
-// addPatternHit() increments the #hits for the file having the specified index from
-// 0 to (numFuzzion2Files - 1); this is done for the pattern and read name of the
-// given hit
+// addPatternHit() increments the #strong hits for the file having the specified index
+// from 0 to (numFuzzion2Files - 1); this is done for the pattern and read1 name of
+// the given hit
 
-void addPatternHit(PatternHitMap& pmap, const Hit *hit, int fileIndex)
+void addPatternHit(PatternHitMap& pmap, const Hit& hit, const int fileIndex)
 {
-   const std::string& patternName = hit->pattern->name;
+   const String& patternName = hit.patternName;
 
    PatternHitMap::iterator ppos = pmap.find(patternName);
    if (ppos == pmap.end())
-   {
-      pmap.insert(std::make_pair(patternName,
-                  PatternHitCount(hit->pattern->annotation, numFuzzion2Files)));
-      ppos = pmap.find(patternName);
-   }
+      ppos = pmap.insert(std::make_pair(patternName,
+                         PatternHitCount(hit.annotation, numFuzzion2Files))).first;
 
    PatternHitCount& patternHitCount = ppos->second;
-   patternHitCount.addHit(hit->read1->name, fileIndex);
+   patternHitCount.addStrongHit(hit.read1->name, fileIndex);
 }
 
 //------------------------------------------------------------------------------------
@@ -163,19 +183,23 @@ void initializePatternHitMap(PatternHitMap& pmap, StringVector& annotationHeadin
       if (!infile.is_open())
          throw std::runtime_error("unable to open " + fuzzion2Filename[i]);
 
-      std::string version;
-      HitVector   hitVector;
+      String    version;
+      HitVector hitVector;
+      uint64_t  numReads;
 
-      readHits(infile, version, annotationHeading, hitVector);
+      readHits(infile, version, annotationHeading, hitVector, numReads);
 
       infile.close();
 
-      int numHits = hitVector.size();
+      const int numHits = hitVector.size();
 
       for (int j = 0; j < numHits; j++)
       {
-         Hit *hit = hitVector[j];
-	 addPatternHit(pmap, hit, i);
+         const Hit *hit = hitVector[j];
+
+         if (hit->isStrong(minStrong))
+            addPatternHit(pmap, *hit, i);
+
 	 delete hit;
       }
    }
@@ -187,12 +211,12 @@ void initializePatternHitMap(PatternHitMap& pmap, StringVector& annotationHeadin
 void writeHeadingLine(const StringVector& annotationHeading)
 {
    std::cout << VERSION_NAME
-             << TAB << "flowcell lane"
-	     << TAB << "read pairs"
-	     << TAB << "other read pairs"
+             << TAB << (byLane ? "flowcell lane" : "flowcell")
+	     << TAB << "strong hits here"
+	     << TAB << "strong hits elsewhere"
 	     << TAB << "file name";
 
-   int numAnnotations = annotationHeading.size();
+   const int numAnnotations = annotationHeading.size();
 
    for (int i = 0; i < numAnnotations; i++)
       std::cout << TAB << annotationHeading[i];
@@ -204,41 +228,43 @@ void writeHeadingLine(const StringVector& annotationHeading)
 // writePossibleHops() writes to stdout each detected possible instance of index
 // hopping
 
-void writePossibleHops(PatternHitMap& pmap)
+void writePossibleHops(const PatternHitMap& pmap)
 {
-   for (PatternHitMap::iterator ppos = pmap.begin(); ppos != pmap.end(); ++ppos)
+   for (PatternHitMap::const_iterator ppos = pmap.cbegin();
+        ppos != pmap.cend(); ++ppos)
    {
-      const std::string& patternName     = ppos->first;
-      PatternHitCount&   patternHitCount = ppos->second;
-      FlowcellLaneMap&   fmap            = patternHitCount.fmap;
+      const String& patternName = ppos->first;
+      const PatternHitCount& patternHitCount = ppos->second;
+      const FlowcellMap& fmap = patternHitCount.fmap;
 
-      for (FlowcellLaneMap::iterator fpos = fmap.begin(); fpos != fmap.end(); ++fpos)
+      for (FlowcellMap::const_iterator fpos = fmap.cbegin();
+           fpos != fmap.cend(); ++fpos)
       {
-         const std::string& flowcellLane      = fpos->first;
-	 const IntVector&   flowcellLaneCount = fpos->second;
+         const String&    flowcell      = fpos->first;
+	 const IntVector& flowcellCount = fpos->second;
 
-	 IntVector positiveFileIndex;  // indices of files having hits
+	 IntVector positiveFileIndex;  // indices of files having strong hits
 
 	 for (int i = 0; i < numFuzzion2Files; i++)
-            if (flowcellLaneCount[i] > 0)
+            if (flowcellCount[i] > 0)
                positiveFileIndex.push_back(i);
 
-	 int numPositive = positiveFileIndex.size();
+	 const int numPositive = positiveFileIndex.size();
 	 if (numPositive < 2)
             continue;
 
 	 // found possible index hopping
 	 for (int j = 0; j < numPositive; j++)
 	 {
-            int i = positiveFileIndex[j];
+            const int i = positiveFileIndex[j];
 
 	    std::cout << patternName
-                      << TAB << flowcellLane
-		      << TAB << flowcellLaneCount[i]
-		      << TAB << patternHitCount.hitCount[i] - flowcellLaneCount[i]
+                      << TAB << flowcell
+		      << TAB << flowcellCount[i]
+		      << TAB << patternHitCount.hitCount[i] - flowcellCount[i]
 		      << TAB << fuzzion2Filename[i];
 
-	    int numAnnotations = patternHitCount.annotation.size();
+	    const int numAnnotations = patternHitCount.annotation.size();
 
 	    for (int k = 0; k < numAnnotations; k++)
                std::cout << TAB << patternHitCount.annotation[k];
@@ -251,7 +277,7 @@ void writePossibleHops(PatternHitMap& pmap)
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {

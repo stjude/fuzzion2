@@ -4,23 +4,24 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #ifndef HIT_H
 #define HIT_H
 
-#include "pattern.h"
+#include "match.h"
 #include <istream>
 #include <limits>
+#include <ostream>
 
-const std::string FUZZION2 = "fuzzion2 ";
+const String FUZZION2 = "fuzzion2 ";
 
-const std::string HIT_DUPLICATE     = "dup";
-const std::string HIT_WEAK          = "weak";
-const std::string HIT_STRONG_NOSPAN = "strong-";
-const std::string HIT_STRONG_SPAN   = "strong+";
+const String HIT_DUPLICATE     = "dup";
+const String HIT_WEAK          = "weak";
+const String HIT_STRONG_NOSPAN = "strong-";
+const String HIT_STRONG_SPAN   = "strong+";
 
 const int MAX_HITS = std::numeric_limits<int>::max();
 
@@ -28,95 +29,88 @@ const int DEFAULT_MIN_STRONG = 15; // default minimum overlap for a strong match
 
 //------------------------------------------------------------------------------------
 
-class HitPattern : public Pattern
+class HitRead // represents one read of a fuzzion2 hit
 {
 public:
-   HitPattern(const std::string& inName, const std::string& inSequence,
-              const StringVector& inAnnotation, int inMatchingBases, int inPossible,
-	      int inSpanningCount, int inInsertSize)
-      : Pattern(inName, inSequence, inAnnotation), matchingBases(inMatchingBases),
-        possible(inPossible), spanningCount(inSpanningCount),
-	insertSize(inInsertSize) { }
-
-   virtual ~HitPattern() { }
-
-   double percentMatch() const { return (100.0 * matchingBases / possible); }
-   bool   isSpanning()   const { return (spanningCount > 0); }
-
-   void write() const;
-
-   int matchingBases; // total number of matching bases in read1 and read2
-   int possible;      // possible number of matching bases
-   int spanningCount; // number of junction-spanning reads (0, 1 or 2)
-   int insertSize;    // insert size of read pair aligned to this pattern
-};
-
-//------------------------------------------------------------------------------------
-
-class HitRead
-{
-public:
-   HitRead(const std::string& inName, int inLeadingBlanks,
-           const std::string& inSequence, int inMatchingBases, bool inIsSpanning,
-	   int inLeftOverlap, int inRightOverlap)
-      : name(inName), leadingBlanks(inLeadingBlanks), sequence(inSequence),
-	matchingBases(inMatchingBases), isSpanning(inIsSpanning),
-	leftOverlap(inLeftOverlap), rightOverlap(inRightOverlap) { }
+   HitRead(const String& inName, const String& inVis, const int inPossible,
+           const int inMatches, const int inSpanning, const int inLoverlap,
+	   const int inRoverlap, const int inLen, const int inHash)
+      : name(inName), vis(inVis), possible(inPossible), matches(inMatches),
+	spanning(inSpanning), loverlap(inLoverlap), roverlap(inRoverlap), len(inLen),
+	hash(inHash) { }
 
    virtual ~HitRead() { }
 
-   int    possible()     const { return sequence.length(); }
-   double percentMatch() const { return (100.0 * matchingBases / possible()); }
+   void write(std::ostream& ostream) const;
 
-   void write() const;
-
-   std::string name;     // read name
-   int  leadingBlanks;   // number of blanks preceding read sequence in the display
-   std::string sequence; // read sequence
-   int  matchingBases;   // number of matching bases (zero for an unmatched mate)
-   bool isSpanning;      // true if this is a junction-spanning read
-   int  leftOverlap;     // number of overlapping bases on the left side
-   int  rightOverlap;    // number of overlapping bases on the right side
+   const String name;   // read name
+   const String vis;    // visualization of read sequence
+   const int possible;  // possible #matching bases
+   const int matches;   // actual   #matching bases
+   const int spanning;  // 1 if spanning, 0 if not
+   const int loverlap;  // length of left/unsided alignment
+   const int roverlap;  // length of right alignment
+   const int len;       // read length
+   const uint32_t hash; // hash of read sequence (for duplicate detection)
 };
 
 //------------------------------------------------------------------------------------
 
-class Hit
+class Hit // represents a fuzzion2 hit
 {
 public:
-   Hit(HitPattern *inPattern, HitRead *inRead1, HitRead *inRead2)
-      : pattern(inPattern), read1(inRead1), read2(inRead2), duplicate(false) { }
+   Hit(const String& inPatternName, const String& inPatternVis,
+       int inPossible, int inMatches, int inSpanning, int inInsertSize,
+       const StringVector& inAnnotation, const HitRead *inRead1,
+       const HitRead *inRead2=nullptr);
 
-   virtual ~Hit() { delete pattern; delete read1; delete read2; }
+   virtual ~Hit() { delete read1; delete read2; }
 
    bool sameAs(const Hit& other) const;
    bool isStrong(int minStrong)  const;
-   bool isSpanning()             const { return pattern->isSpanning(); }
+   String label (int minStrong)  const;
 
-   std::string label(int minStrong) const;
+   void write(std::ostream& ostream) const;
 
-   void write() const { pattern->write(); read1->write(); read2->write(); }
-
-   HitPattern *pattern; // describes the pattern that was matched by a read pair
-   HitRead    *read1;   // describes the first  read of the read pair
-   HitRead    *read2;   // describes the second read of the read pair
-   bool duplicate;      // true if this hit is a duplicate of another hit
+   const String patternName;      // pattern name
+   const String patternVis;       // visualization of pattern sequence
+   const int delim1;              // offset of first delimiter in patternVis
+   const int possible;            // possible #matching bases
+   const int matches;             // actual   #matching bases
+   const int spanning;            // #spanning reads (0, 1 or 2)
+   const int insertSize;          // insert size of read pair or 0 if N/A
+   const StringVector annotation; // pattern annotations
+   const HitRead *read1;          // required read (cannot be nullptr)
+   const HitRead *read2;          // optional second read (may be nullptr)
+   uint64_t hash;                 // hash of read sequence(s) (for duplicate detection)
+   bool duplicate;                // true if this hit is a duplicate of another hit
 };
 
 typedef std::vector<Hit *> HitVector;
 
 //------------------------------------------------------------------------------------
 
-void writeHitHeadingLine(const std::string& version,
+Hit *createHitFromSingleMatch(const Pattern& pattern, int maxmidlen,
+                              double minPercentAgreement, int minOverlap,
+			      const String& readName, const Seq& readSeq,
+			      const SingleMatch& match);
+
+Hit *createHitFromPairMatch(const Pattern& pattern, int maxmidlen,
+                            double minPercentAgreement, int minOverlap,
+			    const String& readName1, const Seq& readSeq1,
+			    const String& readName2, const Seq& readSeq2,
+			    const PairMatch& pairMatch);
+
+void writeHitHeadingLine(std::ostream& ostream, const String& version,
                          const StringVector& annotationHeading);
 
-void writeReadPairLine(uint64_t numReadPairs);
+void writeReadCountLine(std::ostream& ostream, uint64_t numReads);
 
-uint64_t readHits(std::istream& istream, std::string& version,
-		  StringVector& annotationHeading, HitVector& hitVector);
+void readHits(std::istream& istream, String& version, StringVector& annotationHeading,
+              HitVector& hitVector, uint64_t& numReads);
 
 void getPatternIndices(const HitVector& hitVector, IntVector& index);
 
-int maxDisplayLength(const HitVector& hitVector, int begin, int end);
+int maxVisLength(const HitVector& hitVector, int begin, int end);
 
 #endif

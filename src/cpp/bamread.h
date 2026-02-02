@@ -4,14 +4,14 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #ifndef BAMREAD_H
 #define BAMREAD_H
 
-#include <string>
+#include "util.h"
 
 //------------------------------------------------------------------------------------
 
@@ -22,8 +22,8 @@ public:
 
    virtual ~BamRead();
 
-   std::string *name()         const;
-   const char  *constName()    const;
+   String     *name()          const;
+   const char *constName()     const;
 
    int  bitFlag()              const;
    bool isPaired()             const;
@@ -55,8 +55,8 @@ public:
 
    int  length()               const;
 
-   std::string *sequence()     const;
-   std::string *qualities()    const;
+   String *sequence()          const;
+   String *qualities()         const;
 
 protected:
    void *aptr; // opaque pointer to internal data structure
@@ -73,15 +73,15 @@ public:
 
    virtual ~BamReader();
 
-   void open(const std::string& filename);
+   void open(const String& filename);
 
    int  getNumRef() const;
 
-   int  getRefID(const std::string& refName);
-   int  getRefIDAlt(const std::string& refName);
+   int  getRefID(const String& refName) const;
+   int  getRefIDAlt(const String& refName) const;
 
    int  getRefLen(int refID) const;
-   std::string getRefName(int refID) const;
+   String getRefName(int refID) const;
 
    void jump(int refID, int startPosition=1);
 

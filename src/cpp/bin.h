@@ -4,14 +4,14 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #ifndef BIN_H
 #define BIN_H
 
-#include <string>
+#include "util.h"
 
 const int DEFAULT_BINARY_BUFFER_SIZE = 16 * 1024 * 1024; // 16 MB
 const int BINARY_FILE_NOT_OPEN = -1;
@@ -25,7 +25,7 @@ public:
 
    virtual ~BinReader() { delete[] buf; }
 
-   void open(const std::string& binFilename);
+   void open(const String& binFilename);
    bool isOpen() const { return (fd != BINARY_FILE_NOT_OPEN); }
 
    void seek(uint64_t byteOffset);
@@ -42,13 +42,13 @@ public:
 
    void close();
 
-   std::string  filename; // name of binary input file
-   int          fd;       // file descriptor or (-1) if no file is open
-   uint8_t     *buf;      // internal read buffer
-   int          size;     // number of bytes in buf
-   int          len;      // number of bytes used in buf
-   int          index;    // index into buf of next byte to read
-   bool         swap;     // set to true to swap byte ordering of multi-byte integers
+   String   filename; // name of binary input file
+   int      fd;       // file descriptor or (-1) if no file is open
+   uint8_t *buf;      // internal read buffer
+   int      size;     // number of bytes in buf
+   int      len;      // number of bytes used in buf
+   int      index;    // index into buf of next byte to read
+   bool     swap;     // set to true to swap byte ordering of multi-byte integers
 
 protected:
    bool fill();
@@ -63,7 +63,7 @@ public:
 
    virtual ~BinWriter() { delete[] buf; }
 
-   void open(const std::string& binFilename, bool newFile=true);
+   void open(const String& binFilename, bool newFile=true);
    bool isOpen() const { return (fd != BINARY_FILE_NOT_OPEN); }
 
    void writeBuffer(const void *buffer, int numBytes);
@@ -79,12 +79,12 @@ public:
 
    void close();
 
-   std::string  filename; // name of binary output file
-   int          fd;       // file descriptor or (-1) if no file is open
-   uint8_t     *buf;      // internal write buffer
-   int          size;     // number of bytes in buf
-   int          index;    // index into buf of next byte to write
-   uint64_t     flushed;  // number of bytes flushed
+   String   filename; // name of binary output file
+   int      fd;       // file descriptor or (-1) if no file is open
+   uint8_t *buf;      // internal write buffer
+   int      size;     // number of bytes in buf
+   int      index;    // index into buf of next byte to write
+   uint64_t flushed;  // number of bytes flushed
 
 protected:
    void flush();

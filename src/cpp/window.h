@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -19,20 +19,20 @@
 class Window // represents a window of a sequence
 {
 public:
-   Window(Minimizer inMinimizer, int inOffset)
+   Window(const Minimizer inMinimizer, const int inOffset)
       : minimizer(inMinimizer), offset(inOffset) { }
 
    virtual ~Window() { }
 
-   Minimizer minimizer; // window minimizer
-   int       offset;    // offset of first base of minimizing k-mer
+   const Minimizer minimizer; // window minimizer
+   const int       offset;    // offset of first base of minimizing k-mer
 };
 
 typedef std::vector<Window> WindowVector;
 
 //------------------------------------------------------------------------------------
 
-void getWindows(const std::string& sequence, MinimizerWindowLength w,
+void getWindows(const char *sequence, int sequenceLen, MinimizerWindowLength w,
                 const KmerRankTable *rankTable, WindowVector& windowVector);
 
 #endif

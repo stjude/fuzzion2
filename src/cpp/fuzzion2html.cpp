@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,33 +14,31 @@
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_NAME    = "fuzzion2html " + CURRENT_VERSION;
+const String VERSION_NAME   = "fuzzion2html " + CURRENT_VERSION;
 
-const int SECTION_INDENT          = 2;
-const int ANNOTATION_INDENT       = 11;
+const int SECTION_INDENT    = 2;
+const int ANNOTATION_INDENT = 11;
 
-const std::string BLANK           = "&nbsp;";  // non-breaking space character
-const std::string HYPHEN          = "&#8209;"; // non-breaking hyphen
-const std::string DELETE          = "-";       // represents a deleted character
-const std::string NA              = "N/A";     // not applicable
+const String BLANK          = "&nbsp;";  // non-breaking space character
+const String ELLIPSIS       = "&mldr;";  // an ellipsis ...
+const String HYPHEN         = "&#8209;"; // non-breaking hyphen
 
-const std::string ALIGN_CENTER    = "text-align:center";
-const std::string ALIGN_RIGHT     = "text-align:right";
+const String ALIGN_CENTER   = "text-align:center";
+const String ALIGN_RIGHT    = "text-align:right";
 
-const std::string NAME_COLOR      = "color:darkgreen";
-const std::string DELIM_COLOR     = "color:darkred";
-const std::string MISMATCH_COLOR  = "background-color:cyan";
-const std::string INSERT_COLOR    = "background-color:yellow";
-const std::string DELETE_COLOR    = "background-color:lime";
-
-const std::string STRONG_MATCH    = "strong";
-const std::string WEAK_MATCH      = "weak";
-const std::string DUPLICATE_MATCH = "dup";
+const String NAME_COLOR     = "color:darkgreen";
+const String DELIM_COLOR    = "color:darkred";
+const String LEFT_COLOR     = "background-color:#ffe0b0";
+const String MIDDLE_COLOR   = "background-color:#f8ecd8";
+const String RIGHT_COLOR    = "background-color:#ffecbc";
+const String MISMATCH_COLOR = "background-color:cyan";
+const String INSERT_COLOR   = "background-color:yellow";
+const String DELETE_COLOR   = "background-color:lime";
 
 int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
-std::string title = "";             // optional title
-std::string groupColList = "";      // comma-separated list of group column headings
+String title = "";         // optional title
+String groupColList = "";  // comma-separated list of group column headings
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -68,11 +66,11 @@ void showUsage(const char *progname)
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -98,7 +96,7 @@ bool parseArgs(int argc, char *argv[])
 //------------------------------------------------------------------------------------
 // openTag() returns a string that "opens" an HTML tag, e.g., "<b>"
 
-std::string openTag(std::string tag, std::string style="")
+String openTag(const String& tag, const String& style="")
 {
    if (style == "")
       return "<" + tag + ">";
@@ -109,7 +107,7 @@ std::string openTag(std::string tag, std::string style="")
 //------------------------------------------------------------------------------------
 // closeTag() returns a string that "closes" an HTML tag, e.g., "</b>"
 
-std::string closeTag(std::string tag)
+String closeTag(const String& tag)
 {
    return "</" + tag + ">";
 }
@@ -117,18 +115,35 @@ std::string closeTag(std::string tag)
 //------------------------------------------------------------------------------------
 // wrap() returns a string that wraps opening and closing tags around a string
 
-std::string wrap(std::string content, std::string tag, std::string style="")
+String wrap(const String& content, const String& tag, const String& style="")
 {
    return openTag(tag, style) + content + closeTag(tag);
 }
 
 //------------------------------------------------------------------------------------
+// colorString() returns a string that applies a color to the given string
+
+String colorString(const String& content, const String& color)
+{
+   return wrap(content, "span", color);
+}
+
+//------------------------------------------------------------------------------------
+// colorChar() returns a string that applies a color to the given character
+
+String colorChar(const char ch, const String& color)
+{
+   const char content[2] = { ch, 0 };
+   return colorString(content, color);
+}
+
+//------------------------------------------------------------------------------------
 // writeHtmlBegin() writes to stdout the opening lines of the HTML document
 
-void writeHtmlBegin(const std::string& fuzzion2Version, uint64_t numReadPairs,
-                    int numMatches, int numMatched, bool grouping)
+void writeHtmlBegin(const String& fuzzion2Version, const uint64_t numReads,
+                    const int numHits, const int numMatched, const bool grouping)
 {
-   std::string fullTitle = FUZZION2 + fuzzion2Version + " results";
+   String fullTitle = FUZZION2 + fuzzion2Version + " results";
 
    if (title != "")
       fullTitle += " : " + title;
@@ -145,16 +160,18 @@ void writeHtmlBegin(const std::string& fuzzion2Version, uint64_t numReadPairs,
 	     << openTag("body")   << NEWLINE
 	     << openTag("main", "font-family:arial") << NEWLINE
 	     << wrap(fullTitle, "h2") << NEWLINE
-	     << openTag("p") << numReadPairs << " read pairs processed; ";
+	     << openTag("p") << numReads << " reads processed; ";
 
-   if (numMatches == 0)
+   if (numHits == 0)
       std::cout << "no matches";
    else
    {
-      if (numMatches == 1)
-         std::cout << "1 read pair matches 1 ";
+      if (numHits == 1)
+         std::cout << "1 match";
       else
-         std::cout << numMatches << " read pairs match " << numMatched << " ";
+         std::cout << numHits << " matches";
+
+      std::cout << " to " << numMatched << " ";
 
       if (grouping)
          std::cout << (numMatched == 1 ? "pattern group" : "pattern groups");
@@ -178,7 +195,7 @@ void writeHtmlEnd()
 //------------------------------------------------------------------------------------
 // writeSummaryBegin() writes to stdout the opening lines of a pattern or group
 
-void writeSummaryBegin(const Summary *summary, bool grouping)
+void writeSummaryBegin(const Summary *summary, const bool grouping)
 {
    std::cout << openTag("p") << NEWLINE
              << openTag("details") << NEWLINE
@@ -186,14 +203,14 @@ void writeSummaryBegin(const Summary *summary, bool grouping)
 	     << openTag("b")
 	     << (grouping ? "group" : "pattern")
 	     << "<a id=\"" << summary->name << "\">" << BLANK << closeTag("a")
-	     << wrap(summary->name, "span", NAME_COLOR)
-	     << " has " << summary->readPairs << " matching read "
-	     << (summary->readPairs == 1 ? "pair" : "pairs")
+	     << colorString(summary->name, NAME_COLOR)
+	     << " has " << summary->numMatches
+	     << (summary->numMatches == 1 ? " match" : " matches")
 	     << closeTag("b") << " ("
 	     << summary->distinct()   << " distinct, "
-	     << summary->weak         << " weak, "
-	     << summary->strongNospan << " strong-, "
-	     << summary->strongSpan   << " strong+)"
+	     << summary->weak         << " " << HIT_WEAK          << ", "
+	     << summary->strongNospan << " " << HIT_STRONG_NOSPAN << ", "
+	     << summary->strongSpan   << " " << HIT_STRONG_SPAN   << ")"
 	     << closeTag("summary") << NEWLINE;
 }
 
@@ -209,7 +226,7 @@ void writeSummaryEnd()
 // writeAnnotationSectionBegin() writes to stdout the opening lines of an annotation
 // section
 
-void writeAnnotationSectionBegin(bool grouping)
+void writeAnnotationSectionBegin(const bool grouping)
 {
    std::cout << openTag("details", "color:darkred") << NEWLINE
              << openTag("summary");
@@ -233,7 +250,7 @@ void writeAnnotationSectionEnd()
 //------------------------------------------------------------------------------------
 // writeAnnotation() writes an annotation to stdout
 
-void writeAnnotation(const std::string& name, const std::string& value)
+void writeAnnotation(const String& name, const String& value)
 {
    if (value == "")
       return;
@@ -251,10 +268,10 @@ void writeAnnotation(const std::string& name, const std::string& value)
 // writeAllAnnotations() writes the given annotations to stdout
 
 void writeAllAnnotations(const StringVector& annotationHeading,
-                         const StringVector& annotation, bool grouping)
+                         const StringVector& annotation, const bool grouping)
 {
-   int numAnnotationHeadings = annotationHeading.size();
-   int numAnnotations        = annotation.size();
+   const int numAnnotationHeadings = annotationHeading.size();
+   const int numAnnotations        = annotation.size();
 
    bool hasValue = false;
 
@@ -267,11 +284,11 @@ void writeAllAnnotations(const StringVector& annotationHeading,
 
    writeAnnotationSectionBegin(grouping);
 
-   const std::string NO_HEADING = "";
+   const String NO_HEADING = "";
 
    for (int i = 0; i < numAnnotations; i++)
    {
-      const std::string& heading =
+      const String& heading =
          (i < numAnnotationHeadings ? annotationHeading[i] : NO_HEADING);
 
       writeAnnotation(heading, annotation[i]);
@@ -291,7 +308,7 @@ void writeMatchSectionBegin()
    for (int i = 1; i <= SECTION_INDENT; i++)
       std::cout << BLANK;
 
-   std::cout << "matching read pairs" << closeTag("summary") << NEWLINE
+   std::cout << "matches" << closeTag("summary") << NEWLINE
              << openTag("table") << NEWLINE;
 }
 
@@ -302,6 +319,148 @@ void writeMatchSectionEnd()
 {
    std::cout << closeTag("table")   << NEWLINE
              << closeTag("details") << NEWLINE;
+}
+
+//------------------------------------------------------------------------------------
+// isLeftDelimiter() returns true if the given character is a left pattern delimiter
+
+bool isLeftDelimiter(const char ch)
+{
+   return (ch == ']' || ch == '}' || ch == '(');
+}
+
+//------------------------------------------------------------------------------------
+// isRightDelimiter() returns true if the given character is a right pattern delimiter
+
+bool isRightDelimiter(const char ch)
+{
+   return (ch == '[' || ch == '{' || ch == ')');
+}
+
+//------------------------------------------------------------------------------------
+// isExclusion() returns true if the given character identifies an exclusion pattern
+
+bool isExclusion(const char ch)
+{
+   return (ch == '(' || ch == ')');
+}
+
+//------------------------------------------------------------------------------------
+// highlightDelimiter() returns a string that highlights the given delimiter character
+
+String highlightDelimiter(const char ch)
+{
+   const char delimiter[2] = { ch, 0 };
+   return colorString(wrap(delimiter, "b"), DELIM_COLOR);
+}
+
+//------------------------------------------------------------------------------------
+// adjust() replaces blanks with HTML non-breaking blanks and periods with HTML
+// ellipses
+
+String adjust(const String& content)
+{
+   const int len = content.length();
+   String adjustedContent = "";
+
+   for (int i = 0; i < len; i++)
+      if (content[i] == ' ')
+         adjustedContent += BLANK;
+      else if (content[i] == ELLIPSIS_MARK)
+         adjustedContent += ELLIPSIS;
+      else
+         adjustedContent += content[i];
+
+   return adjustedContent;
+}
+
+//------------------------------------------------------------------------------------
+// highlightPattern() returns a highlighted pattern visualization; it is padded with
+// trailing blanks
+
+String highlightPattern(const String& patternVis, const int maxVisLen,
+                        int& delim1, int& delim2, bool& exclusion)
+{
+   const int len = patternVis.length();
+   const int numTrailing = maxVisLen - len;
+   String trailing = ""; // trailing blanks
+
+   for (int i = 1; i <= numTrailing; i++)
+      trailing += BLANK;
+
+   delim1    = -1;       // index of left  delimiter or -1 if not found
+   delim2    = -1;       // index of right delimiter or -1 if not found
+   exclusion = false;    // will be set to true if this is an exclusion pattern
+
+   for (int i = 0; i < len; i++)
+   {
+      const char ch = patternVis[i];
+
+      if (isLeftDelimiter(ch))
+      {
+         delim1    = i;
+	 exclusion = isExclusion(ch);
+      }
+      else if (isRightDelimiter(ch))
+      {
+         delim2    = i;
+	 exclusion = isExclusion(ch);
+	 break;
+      }
+   }
+
+   if (delim1 >= 0 && delim2 >= delim1 + 1)
+   {
+      const int midlen = delim2 - delim1 - 1;
+
+      return 
+      (colorString(adjust(patternVis.substr(0, delim1)), LEFT_COLOR) +
+       highlightDelimiter(patternVis[delim1]) +
+       colorString(adjust(patternVis.substr(delim1 + 1, midlen)), MIDDLE_COLOR) +
+       highlightDelimiter(patternVis[delim2]) +
+       colorString(adjust(patternVis.substr(delim2 + 1)) + trailing, RIGHT_COLOR));
+   }
+   else // unsided pattern
+      return colorString(adjust(patternVis) + trailing, LEFT_COLOR);
+}
+
+//------------------------------------------------------------------------------------
+// highlightRead() returns a highlighted read visualization
+
+String highlightRead(const String& patternVis, const String& readVis,
+                     const int delim1, const int delim2, const bool exclusion)
+{
+   const int len = patternVis.length();
+   if (len != readVis.length())
+      throw std::runtime_error("hit has unexpected visualization length");
+
+   String highlight = "";
+
+   for (int i = 0; i < len; i++)
+   {
+      const char p = patternVis[i];
+      const char r = readVis[i];
+
+      if (r == ' ')
+         highlight += BLANK;
+      else if (r == ELLIPSIS_MARK)
+         highlight += ELLIPSIS;
+      else if (p == ' ')
+         highlight += r;
+      else if (i == delim1 || i == delim2)
+         highlight += highlightDelimiter(r);
+      else if (p == SPACER)
+         highlight += colorChar(r, INSERT_COLOR);
+      else if (r == SPACER)
+         highlight += colorChar(r, DELETE_COLOR);
+      else if ((!exclusion || i < delim1 || i > delim2) &&
+               upperACGT(p) != upperACGT(r))
+         highlight += colorChar(r, MISMATCH_COLOR);
+      else
+         highlight += r;
+   }
+
+   return highlight;
 }
 
 //------------------------------------------------------------------------------------
@@ -331,9 +490,9 @@ void writeBlankRow()
 // writeMatchRow() writes to stdout one row of a match; if number is positive, it is a
 // pattern row; otherwise, it is a read row
 
-void writeMatchRow(std::string matchLabel, int number, int qualifier,
-                   double percentMatch, const std::string& sequence, int length,
-		   std::string name)
+void writeMatchRow(const String& matchLabel, const int number, const int qualifier,
+                   const int matches, const int possible, const String& vis,
+		   const int length, const String& name, bool showAgreement=true)
 {
    std::cout << openTag("tr") << NEWLINE;
 
@@ -352,21 +511,27 @@ void writeMatchRow(std::string matchLabel, int number, int qualifier,
 		<< closeTag("td") << NEWLINE;
 
    // column 3 of 6
-   std::cout << openTag("td", ALIGN_RIGHT)
-	     << BLANK << (percentMatch == 0.0 ? NA : doubleToString(percentMatch))
-             << closeTag("td") << NEWLINE;
+   if (showAgreement)
+      std::cout << openTag("td", ALIGN_RIGHT)
+	        << BLANK << doubleToString(100.0 * matches / possible)
+                << closeTag("td") << NEWLINE;
+   else
+      writeBlankColumn();
 
    // column 4 of 6
    std::cout << openTag("td")
-             << openTag("nobr") << BLANK << sequence << closeTag("nobr")
+             << openTag("nobr") << BLANK << vis << closeTag("nobr")
 	     << closeTag("td") << NEWLINE;
 
    // column 5 of 6
-   std::cout << openTag("td", ALIGN_RIGHT)
-	     << openTag("nobr")
-             << BLANK << (number > 0 ? "isize=" : "length=") << length
-	     << closeTag("nobr")
-	     << closeTag("td") << NEWLINE;
+   if (length == 0)
+      writeBlankColumn();
+   else
+      std::cout << openTag("td", ALIGN_RIGHT)
+	        << openTag("nobr")
+                << BLANK << (number > 0 ? "isize=" : "length=") << length
+	        << closeTag("nobr")
+	        << closeTag("td") << NEWLINE;
 
    // column 6 of 6
    std::cout << openTag("td")
@@ -377,182 +542,34 @@ void writeMatchRow(std::string matchLabel, int number, int qualifier,
 }
 
 //------------------------------------------------------------------------------------
-// highlightPatternSequence() returns a highlighted representation of a pattern
-// sequence
-
-std::string highlightPatternSequence(const std::string& sequence,
-                                     int delim1, int delim2, int maxPatternLen)
-{
-   int numTrailingBlanks = maxPatternLen - sequence.length();
-   std::string trailingBlanks = "";
-
-   for (int i = 1; i <= numTrailingBlanks; i++)
-      trailingBlanks += BLANK;
-
-   return wrap(sequence.substr(0, delim1), "span", "background-color:#ffe0b0") +
-          wrap(wrap(sequence.substr(delim1, 1), "b"), "span", DELIM_COLOR) +
-	  sequence.substr(delim1 + 1, delim2 - delim1 - 1) +
-          wrap(wrap(sequence.substr(delim2, 1), "b"), "span", DELIM_COLOR) +
-          wrap(sequence.substr(delim2 + 1) + trailingBlanks, "span",
-               "background-color:#ffecbc");
-}
-
-//------------------------------------------------------------------------------------
-// isDelimiter() returns true if the given character is a bracket or brace
-
-inline bool isDelimiter(char ch)
-{
-   return (ch == '[' || ch == ']' || ch == '{' || ch == '}');
-}
-
-//------------------------------------------------------------------------------------
-// highlight() finds a longest common subsequence of two strings and uses it to
-// produce a highlighted version of the second string; the first string is a pattern
-// sequence that may contain delimiter characters (brackets or braces); the second
-// string is a read sequence
-
-std::string highlight(const std::string& strA, const std::string& strB)
-{
-   int lenA = strA.length();
-   int lenB = strB.length();
-
-   const char *a = strA.c_str();
-   const char *b = strB.c_str();
-
-   int **c = new int *[lenA + 1];
-
-   for (int i = 0; i <= lenA; i++)
-      c[i] = new int[lenB + 1]();
-
-   for (int i = 0; i < lenA; i++)
-      for (int j = 0; j < lenB; j++)
-         if (a[i] == b[j])
-            c[i + 1][j + 1] = c[i][j] + 1;
-         else
-            c[i + 1][j + 1] = std::max(c[i + 1][j], c[i][j + 1]);
-
-   std::string highlightString = "";
-
-   int i = lenA, j = lenB;
-
-   while (i > 0 || j > 0)
-      if (i > 0 && j > 0 && a[i - 1] == b[j - 1]) // match
-      {
-         highlightString = b[j - 1] + highlightString;
-	 i--;
-	 j--;
-      }
-      else if (i > 0 && j > 0 && !isDelimiter(a[i - 1]) &&
-               c[i - 1][j - 1] == c[i][j - 1] &&
-	       c[i - 1][j - 1] == c[i - 1][j]) // mismatch
-      {
-         highlightString =
-            wrap(std::string(1, b[j - 1]), "span", MISMATCH_COLOR) + highlightString;
-	 i--;
-	 j--;
-      }
-      else if (j > 0 && (i == 0 || c[i][j - 1] >= c[i - 1][j])) // insertion
-      {
-         if (i == lenA) // don't highlight if on last row
-            highlightString = b[j - 1] + highlightString;
-	 else
-            highlightString =
-               wrap(std::string(1, b[j - 1]), "span", INSERT_COLOR) + highlightString;
-	 j--;
-      }
-      else // i > 0
-      {
-         if (isDelimiter(a[i - 1]))
-            highlightString =
-               wrap(wrap(std::string(1, a[i - 1]), "b"), "span", DELIM_COLOR) +
-	       highlightString;
-	 else // deletion
-            highlightString = wrap(DELETE, "span", DELETE_COLOR) + highlightString;
-	 i--;
-      }
-
-   for (int i = 0; i <= lenA; i++)
-      delete c[i];
-
-   delete c;
-
-   return highlightString;
-}
-
-//------------------------------------------------------------------------------------
-// highlightReadSequence() returns a highlighted representation of a read sequence
-// that matches the given pattern sequence
-
-std::string highlightReadSequence(int numLeadingBlanks,
-                                  const std::string& readSequence,
-				  double percentMatch,
-				  const std::string& patternSequence,
-				  int delim1, int delim2)
-{
-   std::string leadingBlanks = "";
-
-   for (int i = 1; i <= numLeadingBlanks; i++)
-      leadingBlanks += BLANK;
-
-   if (percentMatch == 0.0) // unmatched mate
-      return wrap(leadingBlanks + readSequence, "span", "background-color:#c8c8cf");
-
-   int readLen     = readSequence.length();
-   int patternLen  = patternSequence.length();
-
-   int beginOffset = numLeadingBlanks;           // inclusive
-   int endOffset   = numLeadingBlanks + readLen; // exclusive
-
-   if (delim1 < beginOffset)
-   {
-      if (delim2 >= beginOffset && delim2 < endOffset)
-         endOffset++; // account for one delimiter
-   }
-   else if (delim2 <= endOffset)
-      endOffset += 2; // account for two delimiters
-   else if (delim1 <  endOffset)
-      endOffset++;    // account for one delimiter
-
-   endOffset = std::min(endOffset, patternLen);
-
-   if (beginOffset >= endOffset)
-      throw std::runtime_error("truncated pattern sequence: " + patternSequence);
-
-   std::string patternSubstr =
-      patternSequence.substr(beginOffset, endOffset - beginOffset);
-
-   return (leadingBlanks + highlight(patternSubstr, readSequence));
-}
-
-//------------------------------------------------------------------------------------
-// writeMatch() writes to stdout four rows representing a match: one pattern row
-// followed by two read rows representing the matching read pair and one blank row
+// writeMatch() writes to stdout 3 or 4 rows representing a match: 1 pattern row
+// followed by 1 or 2 read rows representing the matching read(s) and 1 blank row
 // for spacing
 
-void writeMatch(int number, int qualifier, const Hit& hit, int maxPatternLen)
+void writeMatch(const int number, const int qualifier, const Hit& hit,
+                const int maxVisLen)
 {
-   std::string highlightPattern =
-      highlightPatternSequence(hit.pattern->displaySequence, hit.pattern->leftBases,
-                               hit.pattern->delim2, maxPatternLen);
+   int  delim1, delim2;
+   bool exclusion;
 
-   std::string highlightRead1 =
-      highlightReadSequence(hit.read1->leadingBlanks,  hit.read1->sequence,
-                            hit.read1->percentMatch(), hit.pattern->displaySequence,
-			    hit.pattern->leftBases, hit.pattern->delim2);
+   String vis = highlightPattern(hit.patternVis, maxVisLen, delim1, delim2,
+                                 exclusion);
 
-   std::string highlightRead2 =
-      highlightReadSequence(hit.read2->leadingBlanks,  hit.read2->sequence,
-                            hit.read2->percentMatch(), hit.pattern->displaySequence,
-			    hit.pattern->leftBases, hit.pattern->delim2);
+   writeMatchRow(hit.label(minStrong), number, qualifier, hit.matches, hit.possible,
+                 vis, hit.insertSize, hit.patternName);
 
-   writeMatchRow(hit.label(minStrong), number, qualifier, hit.pattern->percentMatch(),
-                 highlightPattern, hit.pattern->insertSize, hit.pattern->name);
+   vis = highlightRead(hit.patternVis, hit.read1->vis, delim1, delim2, exclusion);
 
-   writeMatchRow((hit.read1->isSpanning ? "+" : "-"), 0, 0, hit.read1->percentMatch(),
-		 highlightRead1, hit.read1->sequence.length(), hit.read1->name);
+   writeMatchRow(BLANK, 0, 0, hit.read1->matches, hit.read1->possible, vis,
+                 hit.read1->len, hit.read1->name, (hit.read2 ? true : false));
 
-   writeMatchRow((hit.read2->isSpanning ? "+" : "-"), 0, 0, hit.read2->percentMatch(),
-		 highlightRead2, hit.read2->sequence.length(), hit.read2->name);
+   if (hit.read2)
+   {
+      vis = highlightRead(hit.patternVis, hit.read2->vis, delim1, delim2, exclusion);
+
+      writeMatchRow(BLANK, 0, 0, hit.read2->matches, hit.read2->possible, vis,
+                    hit.read2->len, hit.read2->name);
+   }
 
    writeBlankRow();
 }
@@ -562,23 +579,22 @@ void writeMatch(int number, int qualifier, const Hit& hit, int maxPatternLen)
 // matches are given in hitVector from begin (inclusive) to end (exclusive)
 
 void writePattern(const StringVector& annotationHeading, const HitVector& hitVector,
-                  int begin, int end)
+                  const int begin, const int end)
 {
-   Summary *summary = summarizeHits(hitVector, begin, end, minStrong);
+   const Summary *summary = summarizeHits(hitVector, begin, end, minStrong);
    writeSummaryBegin(summary, false);
    delete summary;
 
-   writeAllAnnotations(annotationHeading, hitVector[begin]->pattern->annotation,
-                       false);
+   writeAllAnnotations(annotationHeading, hitVector[begin]->annotation, false);
 
    writeMatchSectionBegin();
 
-   int maxPatternLen = maxDisplayLength(hitVector, begin, end);
+   const int maxVisLen = maxVisLength(hitVector, begin, end);
 
    for (int i = begin; i < end; i++)
    {
       const Hit *hit = hitVector[i];
-      writeMatch(i - begin + 1, 0, *hit, maxPatternLen);
+      writeMatch(i - begin + 1, 0, *hit, maxVisLen);
    }
 
    writeMatchSectionEnd();
@@ -589,9 +605,9 @@ void writePattern(const StringVector& annotationHeading, const HitVector& hitVec
 //------------------------------------------------------------------------------------
 // writeGroup() writes to stdout the annotations and matches of a group
 
-void writeGroup(const StringVector& annotationHeading, Group& group)
+void writeGroup(const StringVector& annotationHeading, const Group& group)
 {
-   Summary *summary = group.summarize(minStrong);
+   const Summary *summary = group.summarize(minStrong);
    writeSummaryBegin(summary, true);
    delete summary;
 
@@ -599,19 +615,20 @@ void writeGroup(const StringVector& annotationHeading, Group& group)
 
    writeMatchSectionBegin();
 
-   int maxPatternLen = group.maxGroupDisplayLength();
+   const int maxVisLen = group.maxGroupVisLength();
 
    int number = 1;
+   const ReadMap& rmap = group.rmap;
 
-   for (ReadMap::iterator rpos = group.rmap.begin(); rpos != group.rmap.end(); ++rpos)
+   for (ReadMap::const_iterator rpos = rmap.cbegin(); rpos != rmap.cend(); ++rpos)
    {
       const HitVector& hitVector = rpos->second;
-      int numHits = hitVector.size();
+      const int numHits = hitVector.size();
 
       for (int i = 0; i < numHits; i++)
       {
          const Hit *hit = hitVector[i];
-         writeMatch(number, (numHits > 1 ? i + 1 : 0), *hit, maxPatternLen);
+         writeMatch(number, (numHits > 1 ? i + 1 : 0), *hit, maxVisLen);
       }
 
       number++;
@@ -625,21 +642,20 @@ void writeGroup(const StringVector& annotationHeading, Group& group)
 //------------------------------------------------------------------------------------
 // writeAllPatterns() writes to stdout an HTML document displaying matches of patterns
 
-void writeAllPatterns(const std::string& fuzzion2Version,
+void writeAllPatterns(const String& fuzzion2Version,
                       const StringVector& annotationHeading,
-                      const HitVector& hitVector, uint64_t numReadPairs)
+                      const HitVector& hitVector, const uint64_t numReads)
 {
    IntVector index;
    getPatternIndices(hitVector, index);
-   int numPatterns = index.size();
+   const int numPatterns = index.size();
 
-   writeHtmlBegin(fuzzion2Version, numReadPairs, hitVector.size(), numPatterns,
-                  false);
+   writeHtmlBegin(fuzzion2Version, numReads, hitVector.size(), numPatterns, false);
 
    for (int i = 0; i < numPatterns; i++)
    {
-      int begin = index[i];
-      int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
+      const int begin = index[i];
+      const int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
 
       writePattern(annotationHeading, hitVector, begin, end);
    }
@@ -650,15 +666,15 @@ void writeAllPatterns(const std::string& fuzzion2Version,
 //------------------------------------------------------------------------------------
 // writeAllGroups() writes to stdout an HTML document displaying matches of groups
 
-void writeAllGroups(const std::string& fuzzion2Version, uint64_t numReadPairs,
-                    GroupManager& groupManager)
+void writeAllGroups(const String& fuzzion2Version, const GroupManager& groupManager,
+                    const uint64_t numReads)
 {
-   writeHtmlBegin(fuzzion2Version, numReadPairs, groupManager.readPairCount(),
+   writeHtmlBegin(fuzzion2Version, numReads, groupManager.readCount(),
                   groupManager.gmap.size(), true);
 
-   GroupMap& gmap = groupManager.gmap;
+   const GroupMap& gmap = groupManager.gmap;
 
-   for (GroupMap::iterator gpos = gmap.begin(); gpos != gmap.end(); ++gpos)
+   for (GroupMap::const_iterator gpos = gmap.cbegin(); gpos != gmap.cend(); ++gpos)
       writeGroup(groupManager.annotationHeading, gpos->second);
 
    writeHtmlEnd();
@@ -666,7 +682,7 @@ void writeAllGroups(const std::string& fuzzion2Version, uint64_t numReadPairs,
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {
@@ -676,20 +692,19 @@ int main(int argc, char *argv[])
 
    try
    {
-      std::string  fuzzion2Version;
+      String       fuzzion2Version;
       StringVector annotationHeading;
       HitVector    hitVector;
+      uint64_t     numReads;
 
-      uint64_t numReadPairs =
-         readHits(std::cin, fuzzion2Version, annotationHeading, hitVector);
+      readHits(std::cin, fuzzion2Version, annotationHeading, hitVector, numReads);
 
       if (groupColList == "")
-         writeAllPatterns(fuzzion2Version, annotationHeading, hitVector,
-                          numReadPairs);
+         writeAllPatterns(fuzzion2Version, annotationHeading, hitVector, numReads);
       else
       {
          GroupManager groupManager(groupColList, annotationHeading, hitVector);
-	 writeAllGroups(fuzzion2Version, numReadPairs, groupManager);
+	 writeAllGroups(fuzzion2Version, groupManager, numReads);
       }
    }
    catch (const std::runtime_error& error)

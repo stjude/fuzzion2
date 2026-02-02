@@ -5,24 +5,23 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "rank.h"
-#include "util.h"
 #include "version.h"
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_NAME = "kmerank " + CURRENT_VERSION;
+const String VERSION_NAME = "kmerank " + CURRENT_VERSION;
 
-const int DEFAULT_KMER_LENGTH  = 15;
-int k = DEFAULT_KMER_LENGTH;         // k-mer length
+const int DEFAULT_KMER_LENGTH = 15;
+int k = DEFAULT_KMER_LENGTH; // k-mer length
 
-std::string refGenFilename     = ""; // name of reference genome input file
-std::string binaryFilename     = ""; // name of binary output file
-std::string textFilename       = ""; // name of text output file
+String refGenFilename = "";  // name of reference genome input file
+String binaryFilename = "";  // name of binary output file
+String textFilename   = "";  // name of text output file
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -55,11 +54,11 @@ void showUsage(const char *progname)
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -88,7 +87,7 @@ bool parseArgs(int argc, char *argv[])
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {
@@ -98,7 +97,7 @@ int main(int argc, char *argv[])
 
    try
    {
-      KmerRankTable *table = createRankTable(k, refGenFilename);
+      const KmerRankTable *table = createRankTable(k, refGenFilename);
 
       table->writeBinary(binaryFilename);
 

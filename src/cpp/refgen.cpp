@@ -4,12 +4,11 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
 #include "refgen.h"
-#include "util.h"
 #include <stdexcept>
 
 const uint32_t TWO_BIT_SIGNATURE_NOSWAP = 0x1A412743;
@@ -33,13 +32,13 @@ uint32_t RefGenReader::readUint32()
 // RefGenReader::open() opens the named file containing a reference genome in 2-bit
 // format; reference names and byte offsets are read from the file header
 
-void RefGenReader::open(const std::string& refGenFilename)
+void RefGenReader::open(const String& refGenFilename)
 {
    BinReader::open(refGenFilename);
 
    swap = false;
 
-   uint32_t signature = readUint32();
+   const uint32_t signature = readUint32();
 
    if (signature == TWO_BIT_SIGNATURE_SWAP)
       swap = true;
@@ -72,8 +71,8 @@ void RefGenReader::open(const std::string& refGenFilename)
 // billion) for endPos; in this case, the end position will be set to the reference
 // length (i.e., the number of positions in the reference)
 
-RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
-                                      int beginPos, int endPos)
+RefGenSeq *RefGenReader::getRefGenSeq(const String& selectedRefName,
+                                      const int beginPos, int endPos)
 {
    int i = 0;
    while (i < numref && refName[i] != selectedRefName)
@@ -85,7 +84,7 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
 
    seek(refOffset[i]);
 
-   uint32_t reflen = readUint32();
+   const uint32_t reflen = readUint32();
 
    if (endPos > reflen)
       endPos = reflen;
@@ -95,7 +94,7 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
 
    char *sequence = new char[endPos - beginPos + 1];
 
-   uint32_t nBlockCount = readUint32();
+   const uint32_t nBlockCount = readUint32();
 
    IntVector nstart(nBlockCount); // vector of N-block first positions,
                                          // 1-based, inclusive
@@ -109,9 +108,9 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
    for (uint32_t i = 0; i < nBlockCount; i++)
       nstop[i] = nstart[i] + readUint32() - 1;
 
-   uint32_t maskBlockCount = readUint32();
+   const uint32_t maskBlockCount = readUint32();
 
-   uint32_t dnaOffset = refOffset[i] +
+   const uint32_t dnaOffset = refOffset[i] +
       2 * sizeof(uint32_t) * (nBlockCount + maskBlockCount + 2);
 
    seek(dnaOffset + ((beginPos - 1) >> 2)); // jump to first DNA byte
@@ -128,8 +127,8 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
       if (readByte && !readUint8(byte))
          throw std::runtime_error("truncated 2-bit file " + filename);
 
-      uint8_t shift = 2 * (3 - ((pos - 1) & 3));
-      uint8_t index = (byte >> shift) & 3;
+      const uint8_t shift = 2 * (3 - ((pos - 1) & 3));
+      const uint8_t index = (byte >> shift) & 3;
 
       sequence[pos - beginPos] = BASE[index];
 
@@ -141,8 +140,8 @@ RefGenSeq *RefGenReader::getRefGenSeq(const std::string& selectedRefName,
    for (uint32_t i = 0; i < nBlockCount; i++)
       if (nstart[i] <= endPos && nstop[i] >= beginPos)
       {
-         int start = std::max(nstart[i], beginPos);
-	 int stop  = std::min(nstop[i],  endPos);
+         const int start = std::max(nstart[i], beginPos);
+	 const int stop  = std::min(nstop[i],  endPos);
 
 	 for (int pos = start; pos <= stop; pos++)
             sequence[pos - beginPos] = 'N';

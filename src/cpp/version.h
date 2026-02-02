@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,8 +14,8 @@
 
 #include <string>
 
-const std::string CURRENT_VERSION = "v1.4.0";
+const std::string CURRENT_VERSION = "v2.0.0";
 
-const std::string COPYRIGHT = "copyright 2023 St. Jude Children's Research Hospital";
+const std::string COPYRIGHT = "copyright 2026 St. Jude Children's Research Hospital";
 
 #endif

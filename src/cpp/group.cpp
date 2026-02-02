@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -16,14 +16,11 @@
 
 void Group::addHit(Hit *hit)
 {
-   const std::string& read1Name = hit->read1->name;
+   const String& readName1 = hit->read1->name;
 
-   ReadMap::iterator rpos = rmap.find(read1Name);
+   ReadMap::iterator rpos = rmap.find(readName1);
    if (rpos == rmap.end())
-   {
-      rmap.insert(std::make_pair(read1Name, HitVector()));
-      rpos = rmap.find(read1Name);
-   }
+      rpos = rmap.insert(std::make_pair(readName1, HitVector())).first;
 
    HitVector& hitVector = rpos->second;
    hitVector.push_back(hit);
@@ -32,15 +29,15 @@ void Group::addHit(Hit *hit)
 //------------------------------------------------------------------------------------
 // Group::summarize() returns a pointer to a newly-allocated Summary of the group
 
-Summary *Group::summarize(int minStrong, std::string sampleID)
+Summary *Group::summarize(const int minStrong, const String& sampleID) const
 {
-   int readPairs = rmap.size();
+   const int numMatches = rmap.size();
    int weak = 0, strongNospan = 0, strongSpan = 0;
 
-   for (ReadMap::iterator rpos = rmap.begin(); rpos != rmap.end(); ++rpos)
+   for (ReadMap::const_iterator rpos = rmap.cbegin(); rpos != rmap.cend(); ++rpos)
    {
       const HitVector& hitVector = rpos->second;
-      int numHits = hitVector.size();
+      const int numHits = hitVector.size();
 
       // find the "best" hit, assuming weak < strongNospan < strongSpan
 
@@ -48,7 +45,7 @@ Summary *Group::summarize(int minStrong, std::string sampleID)
 
       for (int i = 0; i < numHits; i++)
       {
-         std::string label = hitVector[i]->label(minStrong);
+         const String label = hitVector[i]->label(minStrong);
 
 	 if (label == HIT_STRONG_SPAN)
 	 {
@@ -70,28 +67,28 @@ Summary *Group::summarize(int minStrong, std::string sampleID)
          weak++;
    }
 
-   return new Summary(sampleID, readPairs, weak, strongNospan, strongSpan, name,
+   return new Summary(sampleID, numMatches, weak, strongNospan, strongSpan, name,
                       annotation);
 }
 
 //------------------------------------------------------------------------------------
-// Group::maxGroupDisplayLength() returns the maximum length of the pattern display
-// sequence for the hits of the group
+// Group::maxGroupVisLength() returns the maximum length of the visualization sequence
+// for the hits of the group
 
-int Group::maxGroupDisplayLength()
+int Group::maxGroupVisLength() const
 {
-   int overallMaxLength = 0;
+   int overallMaxlen = 0;
 
-   for (ReadMap::iterator rpos = rmap.begin(); rpos != rmap.end(); ++rpos)
+   for (ReadMap::const_iterator rpos = rmap.cbegin(); rpos != rmap.cend(); ++rpos)
    {
       const HitVector& hitVector = rpos->second;
 
-      int maxLength = maxDisplayLength(hitVector, 0, hitVector.size());
-      if (maxLength > overallMaxLength)
-         overallMaxLength = maxLength;
+      const int maxlen = maxVisLength(hitVector, 0, hitVector.size());
+      if (maxlen > overallMaxlen)
+         overallMaxlen = maxlen;
    }
 
-   return overallMaxLength;
+   return overallMaxlen;
 }
 
 //------------------------------------------------------------------------------------
@@ -99,22 +96,22 @@ int Group::maxGroupDisplayLength()
 // identifying the group key column first, followed by zero or more group annotation
 // columns, and initializes the group map to contain the given hits
 
-GroupManager::GroupManager(const std::string& groupColList,
+GroupManager::GroupManager(const String& groupColList,
                            const StringVector& patternAnnotationHeading,
 			   const HitVector& hitVector)
    : annotationHeading(), gmap()
 {
    StringVector groupCol;
-   int numGroupCols = splitString(groupColList, groupCol, ',');
+   const int numGroupCols = splitString(groupColList, groupCol, ',');
 
    for (int i = 0; i < numGroupCols; i++)
-      if (groupCol[i].find_first_not_of(' ') == std::string::npos)
+      if (groupCol[i].find_first_not_of(' ') == String::npos)
          throw std::runtime_error("invalid group column list");
 
    int keyIndex;
    IntVector annotationIndex;
 
-   int numGroupAnnotations   = numGroupCols - 1;
+   const int numGroupAnnotations = numGroupCols - 1;
    int numPatternAnnotations = patternAnnotationHeading.size();
 
    for (int i = 0; i < numGroupCols; i++)
@@ -135,25 +132,25 @@ GroupManager::GroupManager(const std::string& groupColList,
          throw std::runtime_error("missing group column " + groupCol[i]);
    }
 
-   int numHits = hitVector.size();
+   const int numHits = hitVector.size();
 
    for (int i = 0; i < numHits; i++)
    {
       Hit *hit = hitVector[i];
 
-      const StringVector& patternAnnotation = hit->pattern->annotation;
+      const StringVector& patternAnnotation = hit->annotation;
       numPatternAnnotations = patternAnnotation.size();
 
       if (keyIndex >= numPatternAnnotations)
          continue; // no group name
 
-      std::string groupName = patternAnnotation[keyIndex];
+      String groupName = patternAnnotation[keyIndex];
 
-      int first = groupName.find_first_not_of(' ');
-      if (first == std::string::npos)
+      const std::size_t first = groupName.find_first_not_of(' ');
+      if (first == String::npos)
          continue; // no group name
 
-      int last  = groupName.find_last_not_of(' ');
+      const std::size_t last = groupName.find_last_not_of(' ');
       groupName = groupName.substr(first, last - first + 1); // trim blanks from name
 
       GroupMap::iterator gpos = gmap.find(groupName);
@@ -164,7 +161,7 @@ GroupManager::GroupManager(const std::string& groupColList,
 
 	 for (int j = 0; j < numGroupAnnotations; j++)
 	 {
-            int k = annotationIndex[j];
+            const int k = annotationIndex[j];
 
 	    if (k < numPatternAnnotations)
                groupAnnotation.push_back(patternAnnotation[k]);
@@ -172,9 +169,8 @@ GroupManager::GroupManager(const std::string& groupColList,
                groupAnnotation.push_back(" ");
 	 }
 
-	 gmap.insert(std::make_pair(groupName, Group(groupName, groupAnnotation)));
-
-	 gpos = gmap.find(groupName);
+	 gpos = gmap.insert(
+             std::make_pair(groupName, Group(groupName, groupAnnotation))).first;
       }
 
       Group& group = gpos->second;
@@ -183,13 +179,13 @@ GroupManager::GroupManager(const std::string& groupColList,
 }
 
 //------------------------------------------------------------------------------------
-// GroupManager::readPairCount() returns the number of read pairs in the group
+// GroupManager::readCount() returns the total number of reads in groups
 
-int GroupManager::readPairCount()
+int GroupManager::readCount() const
 {
    int count = 0;
 
-   for (GroupMap::iterator gpos = gmap.begin(); gpos != gmap.end(); ++gpos)
+   for (GroupMap::const_iterator gpos = gmap.cbegin(); gpos != gmap.cend(); ++gpos)
    {
       const Group& group = gpos->second;
       count += group.rmap.size();

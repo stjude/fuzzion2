@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,7 +14,7 @@
 //------------------------------------------------------------------------------------
 // kmerToString() converts the given k-mer to a string
 
-std::string kmerToString(KmerLength k, Kmer kmer)
+String kmerToString(const KmerLength k, Kmer kmer)
 {
    if (k > MAX_KMER_LENGTH)
       throw std::runtime_error("unsupported k-mer length");
@@ -34,18 +34,17 @@ std::string kmerToString(KmerLength k, Kmer kmer)
 //------------------------------------------------------------------------------------
 // stringToKmer() converts the given string to a k-mer
 
-Kmer stringToKmer(const std::string& s)
+Kmer stringToKmer(const String& s)
 {
    if (s.length() > MAX_KMER_LENGTH)
       throw std::runtime_error("unsupported k-mer length");
 
-   KmerLength k = s.length();
-
+   const KmerLength k = s.length();
    Kmer kmer = 0;
 
    for (int i = 0; i < k; i++)
    {
-      Base base = charToBase(s[i]);
+      const Base base = charToBase(s[i]);
 
       if (base < NUM_BASES)
          kmer = (kmer << 2) | base;
@@ -59,7 +58,7 @@ Kmer stringToKmer(const std::string& s)
 //------------------------------------------------------------------------------------
 // kmerReverseComplement() returns the reverse complement of the given k-mer
 
-Kmer kmerReverseComplement(KmerLength k, Kmer kmer)
+Kmer kmerReverseComplement(const KmerLength k, Kmer kmer)
 {
    if (k > MAX_KMER_LENGTH)
       throw std::runtime_error("unsupported k-mer length");
@@ -76,39 +75,31 @@ Kmer kmerReverseComplement(KmerLength k, Kmer kmer)
 }
 
 //------------------------------------------------------------------------------------
-// charReverseComplement() returns the reverse complement of the given array of char
-// in a newly allocated array of char; it is the caller's obligation to de-allocate it
+// stringReverseComplement() returns the reverse complement of the given string;
+// case (upper or lower) is retained
 
-char *charReverseComplement(const char *s, int slen)
+String stringReverseComplement(const String& s)
 {
-   char *revcomp = new char[slen];
+   const int A_to_T = 'T' - 'A';
+   const int C_to_G = 'G' - 'C';
+
+   String revcomp = s;
+   const int slen = s.length();
 
    for (int i = 0; i < slen; i++)
    {
-      char ch    = s[slen - i - 1];
-      Base base  = charToBase(ch);
+      char ch = s[slen - i - 1];
 
-      revcomp[i] = (base < NUM_BASES ? BASE_CHAR[3 - base] : ch);
-   }
+      switch (ch)
+      {
+         case 'A': case 'a': ch += A_to_T; break;
+         case 'C': case 'c': ch += C_to_G; break;
+         case 'G': case 'g': ch -= C_to_G; break;
+         case 'T': case 't': ch -= A_to_T; break;
+         default : break; // leave character unchanged
+      }
 
-   return revcomp;
-}
-
-//------------------------------------------------------------------------------------
-// stringReverseComplement() returns the reverse complement of the given string
-
-std::string stringReverseComplement(const std::string& s)
-{
-   std::string revcomp = s;
-
-   int slen = s.length();
-
-   for (int i = 0; i < slen; i++)
-   {
-      char ch    = s[slen - i - 1];
-      Base base  = charToBase(ch);
-
-      revcomp[i] = (base < NUM_BASES ? BASE_CHAR[3 - base] : ch);
+      revcomp[i] = ch;
    }
 
    return revcomp;
@@ -118,19 +109,18 @@ std::string stringReverseComplement(const std::string& s)
 // KmerFinder::KmerFinder() checks for a valid k-mer length and initializes data
 // members
 
-KmerFinder::KmerFinder(const char *sequence, int sequenceLen, KmerLength kmerLen)
-   : seq(sequence), seqlen(sequenceLen), k(kmerLen)
+KmerFinder::KmerFinder(const char *sequence, const int sequenceLen,
+                       const KmerLength kmerLen)
+   : seq(sequence), seqlen(sequenceLen), k(kmerLen), mask(numKmers(kmerLen) - 1)
 {
    if (k < 1 || k > MAX_KMER_LENGTH)
       throw std::runtime_error("unsupported k-mer length");
-
-   mask = numKmers(k) - 1;
 }
 
 //------------------------------------------------------------------------------------
 // KmerFinder::find() searches for k-mers in the sequence; each k-mer that is found is
 // reported along with its starting index in the sequence; the search terminates when
-// the sequence has been exhausted or when report() returns false; this function
+// the sequence has been exhausted or when reportKmer() returns false; this function
 // consumes a large fraction of the running time of fuzzion2 and so an effort has been
 // made to optimize it
 

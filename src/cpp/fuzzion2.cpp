@@ -1,72 +1,73 @@
 //------------------------------------------------------------------------------------
 //
 // fuzzion2.cpp - this program is a "fuzzy fusion finder"; it does fuzzy matching of
-//                read pairs to fusion patterns
+//                reads to patterns
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
-#include "fastq.h"
 #include "hit.h"
-#include "match.h"
-#include "ubam.h"
+#include "read.h"
 #include "version.h"
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
 
-const std::string VERSION_NAME   = FUZZION2 + CURRENT_VERSION;
+const String VERSION_NAME = FUZZION2 + CURRENT_VERSION;
 
-const int    THREAD_BATCH_SIZE   = 100000; // number of read pairs in a full batch
+const int    READ_BATCH_SIZE        = 10000; // number of reads in a full batch
+const int    MAX_MID_LEN            = 25;    // visualization parameter
 
-const double DEFAULT_MAX_RANK    = 99.9; // default max rank percentile of minimizers
-const double DEFAULT_MIN_BASES   = 90.0; // default min percentile of matching bases
-const int    DEFAULT_MAX_INSERT  = 500;  // default max insert size in bases
-const int    DEFAULT_MAX_TRIM    = 5;    // default max bases, second ahead of first
-const int    DEFAULT_MIN_MINS    = 1;    // default min number of matching minimizers
-const int    DEFAULT_MIN_OVERLAP = 5;    // default min length of overlap in #bases
-const int    DEFAULT_SHOW        = 1;    // default setting of -show option
-const int    DEFAULT_SINGLE      = 0;    // default setting of -single option
-const int    DEFAULT_THREADS     = 8;    // default number of threads
-const int    DEFAULT_WINDOW_LEN  = 10;   // default length of windows in #bases
+// option defaults
+const double DEFAULT_MAX_RANK       = 99.9;  // max rank percentile of minimizers
+const double DEFAULT_MIN_BASES      = 90.0;  // min percentile of matching bases
+const int    DEFAULT_MAX_INSERT     = 600;   // max insert size in bases
+const int    DEFAULT_MAX_TRIM       = 5;     // max bases, second ahead of first
+const int    DEFAULT_MIN_OVERLAP    = 7;     // min length of overlap in #bases
+const int    DEFAULT_SHOW           = 1;     // setting of -show option
+const int    DEFAULT_SINGLE         = 0;     // setting of -single option
+const int    DEFAULT_THREADS        = 8;     // number of threads
+const int    DEFAULT_WINDOW_LEN     = 10;    // length of windows in #bases
 
 double maxRank    = DEFAULT_MAX_RANK;
 double minBases   = DEFAULT_MIN_BASES;
 int    maxInsert  = DEFAULT_MAX_INSERT;
 int    maxTrim    = DEFAULT_MAX_TRIM;
-int    minMins    = DEFAULT_MIN_MINS;
 int    minOverlap = DEFAULT_MIN_OVERLAP;
 int    show       = DEFAULT_SHOW;
 int    single     = DEFAULT_SINGLE;
 int    numThreads = DEFAULT_THREADS;
 int    w          = DEFAULT_WINDOW_LEN;
 
-std::string    patternFilename = ""; // name of pattern input file
-std::string    rankFilename    = ""; // name of k-mer rank table binary input file
+String logFilename     = "";  // name of output file for logging
 
-std::string    fastqFilename1  = ""; // name of FASTQ input file containing Read 1
-std::string    fastqFilename2  = ""; // name of FASTQ input file containing Read 2
-std::string    ifastqFilename  = ""; // name of interleaved FASTQ input file
-std::string    ubamFilename    = ""; // name of unaligned Bam input file
-StringVector   inputFilename;        // names of input files listed on command line
+String patternFilename = "";  // name of pattern input file
+String rankFilename    = "";  // name of k-mer rank table binary input file
 
-KmerRankTable *rankTable;            // holds the k-mer rank table
-Minimizer      maxMinimizer;         // limit used to identify common minimizers
+String fastqFilename1  = "";  // name of FASTQ input file containing Read 1
+String fastqFilename2  = "";  // name of FASTQ input file containing Read 2
+String ifastqFilename  = "";  // name of interleaved FASTQ input file
+String ubamFilename    = "";  // name of unaligned Bam input file
+StringVector inputFilename;   // names of FASTQ/Bam input files listed on command line
 
-PatternVector *patternVector;        // holds the input patterns
-PatternMap    *patternMap;           // index of pattern minimizers
+KmerRankTable *rankTable;     // holds the k-mer rank table
+Minimizer      maxMinimizer;  // limit used to identify common minimizers
 
-PairReader    *pairReader;           // used to get read pairs from input files
-bool           endOfInput = false;   // set to true when done getting read pairs
+PatternVector *patternVector; // holds the input patterns
+PatternMap    *patternMap;    // index of pattern minimizers
+BoolVector    *inPatternMap;  // indicates which minimizers are in patternMap
 
-std::mutex     inputMutex;           // for getting read pairs
-std::mutex     outputMutex;          // for writing hits to std::cout
+std::mutex     inputMutex;    // enforces mutual exclusion when getting reads
+std::mutex     outputMutex;   // enforces mutual exclusion when writing hits
 
-uint64_t       numReadPairs = 0;     // number of read pairs found in the input
+SingleReader  *singleReader = nullptr;  // for getting single reads from input files
+PairReader    *pairReader   = nullptr;  // for getting read pairs from input files
+bool           endOfInput   = false;    // set to true when done getting reads
+uint64_t       numReads     = 0;        // number of reads found in the input
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -89,8 +90,8 @@ void showUsage(const char *progname)
 
    std::cerr
       << NEWLINE
-      << "Specify -fastq1 and -fastq2, or -ifastq or -ubam, "
-      << "or list filenames on command line" << NEWLINE
+      << "Specify -fastq1 and -fastq2, or -ifastq or -ubam," << NEWLINE
+      << "or list the names of FASTQ and Bam files on the command line" << NEWLINE
       << "  -fastq1=filename    "
              << "name of FASTQ Read 1 input file" << NEWLINE
       << "  -fastq2=filename    "
@@ -116,9 +117,6 @@ void showUsage(const char *progname)
       << "  -minbases=N   "
              << "minimum percentile of matching bases. . . . . . . . default "
 	     << doubleToString(DEFAULT_MIN_BASES) << NEWLINE
-      << "  -minmins=N    "
-             << "minimum number of matching minimizers . . . . . . . default "
-	     << DEFAULT_MIN_MINS << NEWLINE
       << "  -minov=N      "
              << "minimum overlap in number of bases. . . . . . . . . default "
              << DEFAULT_MIN_OVERLAP << NEWLINE
@@ -126,7 +124,7 @@ void showUsage(const char *progname)
              << "show best only (1) or all patterns (0) that match . default "
 	     << DEFAULT_SHOW << NEWLINE
       << "  -single=N     "
-             << "show single-read (1) or just read-pair (0) matches. default "
+             << "show single-read (1) or read-pair (0) matches . . . default "
 	     << DEFAULT_SINGLE << NEWLINE
       << "  -threads=N    "
              << "number of threads . . . . . . . . . . . . . . . . . default "
@@ -139,11 +137,11 @@ void showUsage(const char *progname)
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -163,12 +161,12 @@ bool parseArgs(int argc, char *argv[])
           doubleOpt(opt, "minbases", minBases)        ||
 	  intOpt   (opt, "maxins",   maxInsert)       ||
 	  intOpt   (opt, "maxtrim",  maxTrim)         ||
-	  intOpt   (opt, "minmins",  minMins)         ||
           intOpt   (opt, "minov",    minOverlap)      ||
           intOpt   (opt, "show",     show)            ||
 	  intOpt   (opt, "single",   single)          ||
 	  intOpt   (opt, "threads",  numThreads)      ||
           intOpt   (opt, "w",        w)               ||
+	  stringOpt(opt, "log",      logFilename)     || // log option for debugging
           stringOpt(opt, "pattern",  patternFilename) ||
 	  stringOpt(opt, "rank",     rankFilename)    ||
 	  stringOpt(opt, "fastq1",   fastqFilename1)  ||
@@ -180,202 +178,146 @@ bool parseArgs(int argc, char *argv[])
       return false; // unrecognized option
    }
 
-   if (inputFilename.size() > 0)  // list of file names on the command line
-   {
-      if (fastqFilename1 != "" || fastqFilename2 != "" || ifastqFilename != "" ||
-          ubamFilename != "")
-         return false;
-   }
-   else if (fastqFilename1 != "") // pair of FASTQ input files
-   {
-      if (fastqFilename2 == "" || ifastqFilename != "" || ubamFilename != "")
-         return false;
-   }
-   else if (ifastqFilename != "") // interleaved FASTQ input file
-   {
-      if (fastqFilename2 != "" || ubamFilename != "")
-         return false;
-   }
-   else if (ubamFilename != "")   // unaligned Bam input file
-   {
-      if (fastqFilename2 != "")
-         return false;
-   }
-   else // missing input file names
-      return false;
-
-   return (maxRank > 0.0 && maxRank <= 100.0 && minBases > 0.0 && minBases <= 100.0 &&
-	   maxInsert > 0 && maxTrim >= 0 && minMins > 0 && minOverlap > 0 &&
+   return (maxRank > 0.0 && maxRank <= 100.0 &&
+           minBases >= 50.0 && minBases <= 100.0 &&
+	   maxInsert > 0 && maxTrim >= 0 && minOverlap >= TRIMER_LEN &&
 	   (show == 0 || show == 1) && (single == 0 || single == 1) &&
 	   numThreads > 0 && numThreads <= 64 && w > 0 && w < 256 &&
 	   patternFilename != "" && rankFilename != "");
 }
 
 //------------------------------------------------------------------------------------
-// createInputReader() analyzes the given vector of input file names and returns a
-// newly allocated InputReader object for reading the input files
+// writeHits() writes to stdout each hit in the given vector; the hits are then
+// de-allocated
 
-InputReader *createInputReader(const StringVector& inputFilename)
+void writeHits(HitVector& hitVector)
 {
-   int numInputFiles = inputFilename.size();
-   if (numInputFiles == 0)
-      throw std::runtime_error("no input files");
-
-   BoolVector   processed(numInputFiles, false);
-   StringVector name1(numInputFiles, "");
-   StringVector name2(numInputFiles, "");
-
-   PairReaderVector readerVector;
-
-   for (int i = 0; i < numInputFiles; i++)
-      if (isUbamFile(inputFilename[i]))
-      {
-         readerVector.push_back(new UbamPairReader(inputFilename[i]));
-	 processed[i] = true;
-      }
-      else
-      {
-         bool interleaved;
-
-	 if (!isFastqFile(inputFilename[i], name1[i], name2[i], interleaved))
-            throw std::runtime_error("unsupported file type " + inputFilename[i]);
-
-	 if (interleaved)
-	 {
-            readerVector.push_back(new InterleavedFastqPairReader(inputFilename[i]));
-	    processed[i] = true;
-	 }
-      }
-
-   // now pair up the unprocessed FASTQ files
-
-   for (int i = 0; i < numInputFiles; i++)
-      if (!processed[i])
-      {
-         for (int j = i + 1; j < numInputFiles; j++)
-            if (!processed[j] && namesMatch(name1[i], name1[j]) &&
-                                 namesMatch(name2[i], name2[j]))
-	    {
-               readerVector.push_back(new FastqPairReader(inputFilename[i],
-                                                          inputFilename[j]));
-	       processed[i] = true;
-	       processed[j] = true;
-	       break;
-	    }
-
-	 if (!processed[i])
-            throw std::runtime_error("unsupported FASTQ file " + inputFilename[i]);
-      }
-
-   return new InputReader(readerVector);
-}
-
-//------------------------------------------------------------------------------------
-// writeMatch() writes a match to stdout showing the alignment of reads to a pattern;
-// pattern delimiters (i.e., brackets and braces) are accounted for
-
-void writeMatch(const std::string& name1, const std::string& sequence1,
-                const std::string& name2, const std::string& sequence2,
-		const Match& match)
-{
-   const Pattern& pattern = (*patternVector)[match.c1.index];
-
-   int offset1 = match.c1.offset;
-   int offset2 = match.c2.offset;
-
-   int leftOffset = std::min(offset1, offset2);
-   int fullLength = pattern.displaySequence.length();
-   int displayLen = std::min(match.insertSize() + 2, fullLength - leftOffset);
-
-   std::string displaySeq = pattern.displaySequence.substr(leftOffset, displayLen);
-
-   int leading1 = 0, leading2 = 0; // number of leading blanks
-
-   if (offset1 < offset2)      // first read aligns ahead of second read
-      leading2 = offset2 - offset1 +
-                 (offset2 >= pattern.sequence.length() - pattern.rightBases ? 2 :
-		 (offset2 >= pattern.leftBases ? 1 : 0));
-   else if (offset2 < offset1) // second read aligns ahead of first read
-      leading1 = offset1 - offset2 +
-                 (offset1 >= pattern.sequence.length() - pattern.rightBases ? 2 :
-		 (offset1 >= pattern.leftBases ? 1 : 0));
-
-   HitPattern *hitPattern =
-      new HitPattern(pattern.name, displaySeq, pattern.annotation,
-                     match.matchingBases(), match.possible(), match.numSpanning(),
-		     match.insertSize());
-
-   HitRead *hitRead1 =
-      new HitRead(name1, leading1, sequence1,
-                  match.c1.matchingBases, match.c1.junctionSpanning,
-		  match.c1.leftOverlap, match.c1.rightOverlap);
-
-   HitRead *hitRead2 =
-      new HitRead(name2, leading2, sequence2,
-                  match.c2.matchingBases, match.c2.junctionSpanning,
-		  match.c2.leftOverlap, match.c2.rightOverlap);
-
-   Hit hit(hitPattern, hitRead1, hitRead2);
-   hit.write();
-}
-
-//------------------------------------------------------------------------------------
-// processOrientation() matches the given read pair to the set of patterns
-
-void processOrientation(const std::string& name1, const std::string& sequence1,
-                        const std::string& name2, const std::string& sequence2)
-{
-   MatchVector matchVector;
-
-   getMatches(sequence1, sequence2, patternVector, patternMap, w, rankTable,
-              maxMinimizer, minBases, minMins, maxInsert, maxTrim, (show == 1),
-	      (single == 1), matchVector);
-
-   int numMatches = matchVector.size();
-   if (numMatches == 0)
-      return; // no matches
-
-   std::string revcomp = stringReverseComplement(sequence2);
-
-   // determine the number of matches with valid overlaps
-   int numValid = 0;
-
-   while (numValid < numMatches &&
-          matchVector[numValid].validOverlaps(sequence1, revcomp, patternVector,
-                                              minBases, minOverlap))
-      numValid++;
-
-   if (numValid == 0)
-      return; // no valid matches
-
-   // write valid matches
+   const int numHits = hitVector.size();
+   if (numHits == 0)
+      return;
 
    if (numThreads > 1)
       outputMutex.lock();
 
-   for (int i = 0; i < numValid; i++)
-      writeMatch(name1, sequence1, name2, revcomp, matchVector[i]);
+   for (int i = 0; i < numHits; i++)
+      hitVector[i]->write(std::cout);
 
    if (numThreads > 1)
       outputMutex.unlock();
+
+   // cleanup
+   for (int i = 0; i < numHits; i++)
+      delete hitVector[i];
 }
 
 //------------------------------------------------------------------------------------
-// processBatch() processes the given batch of read pairs; if an exception is raised,
-// its message is provided
+// processSingleRead() finds matches of the given single read and writes those that
+// are qualified as hits
 
-void processBatch(int count,
-                  const StringVector& name1, const StringVector& seq1,
-                  const StringVector& name2, const StringVector& seq2,
-		  std::string& message)
+void processSingleRead(const String& readName, const String& readStr)
+{
+   Seq *readSeq;
+   SingleMatchMap mmap;
+
+   if (getSingleMatches(readStr, w, rankTable, maxMinimizer, *patternMap,
+                        *inPatternMap, *patternVector, minBases, minOverlap, readSeq,
+			mmap) == 0)
+      return; // no matches
+
+   SingleMatchMap bestMap;
+   selectBestSingleMatches((show == 1), mmap, bestMap);
+
+   HitVector hitVector;
+
+   for (SingleMatchMap::const_iterator mpos = bestMap.cbegin();
+        mpos != bestMap.cend(); ++mpos)
+   {
+      const Pattern& pattern = *(*patternVector)[mpos->first];
+      const SingleMatchVector& mvector = mpos->second;
+
+      Hit *hit = createHitFromSingleMatch(pattern, MAX_MID_LEN, minBases, minOverlap,
+                                          readName, *readSeq, *mvector[0]);
+      hitVector.push_back(hit);
+   }
+
+   writeHits(hitVector);
+
+   // cleanup
+   delete readSeq;
+   freeSingleMatchMap(mmap);
+   freeSingleMatchMap(bestMap);
+}
+
+//------------------------------------------------------------------------------------
+// processReadPair() finds matches of the given read pair and writes those that are
+// qualified as hits
+
+void processReadPair(const String& readName1, const String& readStr1,
+                     const String& readName2, const String& readStr2)
+{
+   Seq *readSeq1, *readSeq2;
+   PairMatchMap pairMap;
+
+   if (getPairMatches(readStr1, readStr2, w, rankTable, maxMinimizer, *patternMap,
+                      *inPatternMap, *patternVector, minBases, minOverlap, maxInsert,
+		      maxTrim, readSeq1, readSeq2, pairMap) == 0)
+      return; // no matches
+
+   PairMatchMap bestMap;
+
+   if (show == 1)
+      selectBestPairMatch(pairMap, bestMap);
+
+   const PairMatchMap& pmap = (show == 1 ? bestMap : pairMap);
+
+   HitVector hitVector;
+
+   for (PairMatchMap::const_iterator ppos = pmap.cbegin();
+        ppos != pmap.cend(); ++ppos)
+   {
+      const Pattern& pattern = *(*patternVector)[ppos->first];
+      const PairMatch *pairMatch = ppos->second;
+
+      Hit *hit = createHitFromPairMatch(pattern, MAX_MID_LEN, minBases, minOverlap,
+                                        readName1, *readSeq1, readName2, *readSeq2,
+					*pairMatch);
+      hitVector.push_back(hit);
+   }
+
+   writeHits(hitVector);
+
+   // cleanup
+   delete readSeq1;
+   delete readSeq2;
+   freePairMatchMap(pairMap);
+   freePairMatchMap(bestMap);
+}
+
+//------------------------------------------------------------------------------------
+// processBatch() processes the given batch of reads; if an exception is raised, its
+// message is provided
+
+void processBatch(const int count, String& message,
+                  String *readName1, String *readStr1,
+                  String *readName2=nullptr, String *readStr2=nullptr)
 {
    try
-   {
-      for (int i = 0; i < count; i++)
-      {
-         processOrientation(name1[i], seq1[i], name2[i], seq2[i]);
-         processOrientation(name2[i], seq2[i], name1[i], seq1[i]);
-      }
+   {  // process both orientations
+
+      if (single == 1)
+         for (int i = 0; i < count; i++)
+         {
+            processSingleRead(readName1[i], readStr1[i]);
+
+	    const String revcomp = stringReverseComplement(readStr1[i]);
+	    processSingleRead(readName1[i], revcomp);
+	 }
+      else
+         for (int i = 0; i < count; i++)
+	 {
+            processReadPair(readName1[i], readStr1[i], readName2[i], readStr2[i]);
+            processReadPair(readName2[i], readStr2[i], readName1[i], readStr1[i]);
+	 }
    }
    catch (const std::runtime_error& error)
    {
@@ -392,74 +334,109 @@ void processBatch(int count,
 }
 
 //------------------------------------------------------------------------------------
-// getBatch() gets the next batch of read pairs and returns the number of read pairs
-// obtained; if less than a full batch, end-of-input was reached; if an exception was
-// raised, its message is provided
+// getBatch() gets the next batch of reads and returns the number of reads or read
+// pairs obtained; if less than a full batch, end-of-input was reached; if an
+// exception was raised, its message is provided
 
-int getBatch(StringVector& name1, StringVector& seq1,
-             StringVector& name2, StringVector& seq2, std::string& message)
+int getBatch(const int batchSize, String& message,
+             String *readName1, String *readStr1,
+             String *readName2=nullptr, String *readStr2=nullptr)
 {
+   if (endOfInput)
+      return 0;
+
    int count = 0;
+
+   if (numThreads > 1)
+      inputMutex.lock();
 
    if (!endOfInput)
    {
-      if (numThreads > 1)
-         inputMutex.lock();
-
-      if (!endOfInput)
+      try
       {
-         try
-	 {
-            while (count < THREAD_BATCH_SIZE &&
-                   pairReader->getNextPair(name1[count], seq1[count],
-                                           name2[count], seq2[count]))
+         if (single == 1)
+            while (count < batchSize &&
+                   singleReader->getNext(readName1[count], readStr1[count]))
                count++;
-
-	    numReadPairs += count;
-	 }
-	 catch (const std::runtime_error& error)
-	 {
-            message = error.what();
-	 }
-
-	 if (message != "" || count < THREAD_BATCH_SIZE)
-            endOfInput = true;
+	 else
+            while (count < batchSize &&
+                   pairReader->getNext(readName1[count], readStr1[count],
+                                       readName2[count], readStr2[count]))
+               count++;
       }
+      catch (const std::runtime_error& error) { message = error.what(); }
 
-      if (numThreads > 1)
-         inputMutex.unlock();
+      if (single == 1)
+         numReads += count;
+      else
+         numReads += 2 * count;
+
+      if (message != "" || count < batchSize)
+         endOfInput = true;
    }
+
+   if (numThreads > 1)
+      inputMutex.unlock();
 
    return count;
 }
 
 //------------------------------------------------------------------------------------
-// threadWork() contains the work that each thread performs, processing read pairs
-// until end-of-input is detected; if an exception occurs, its message is provided
+// threadWork() contains the work that each thread performs, processing reads until
+// end-of-input is detected; if an exception occurs, its message is provided
 
-void threadWork(std::string *message)
+void threadWork(String *message)
 {
-   StringVector name1(THREAD_BATCH_SIZE, "");
-   StringVector seq1 (THREAD_BATCH_SIZE, "");
-   StringVector name2(THREAD_BATCH_SIZE, "");
-   StringVector seq2 (THREAD_BATCH_SIZE, "");
-
    int count;
 
-   // keep going until an exception is raised or end-of-input is reached
-   do
+   if (single == 1)
    {
-      count = getBatch(name1, seq1, name2, seq2, *message);
+      const int batchSize = READ_BATCH_SIZE;
 
-      if (*message == "" && count > 0)
-         processBatch(count, name1, seq1, name2, seq2, *message);
+      String *readName = new String[batchSize];
+      String *readStr  = new String[batchSize];
+
+      do
+      {
+         count = getBatch(batchSize, *message, readName, readStr);
+
+	 if (*message == "" && count > 0)
+            processBatch(count, *message, readName, readStr);
+      }
+      while (*message == "" && count == batchSize);
+
+      delete[] readName;
+      delete[] readStr;
    }
-   while (*message == "" && count == THREAD_BATCH_SIZE);
+   else
+   {
+      const int batchSize = READ_BATCH_SIZE / 2;
+
+      String *readName1 = new String[batchSize];
+      String *readStr1  = new String[batchSize];
+      String *readName2 = new String[batchSize];
+      String *readStr2  = new String[batchSize];
+
+      do
+      {
+         count = getBatch(batchSize, *message, readName1, readStr1, readName2,
+                          readStr2);
+
+	 if (*message == "" && count > 0)
+            processBatch(count, *message, readName1, readStr1, readName2, readStr2);
+      }
+      while (*message == "" && count == batchSize);
+
+      delete[] readName1;
+      delete[] readStr1;
+      delete[] readName2;
+      delete[] readStr2;
+   }
 }
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {
@@ -469,39 +446,37 @@ int main(int argc, char *argv[])
 
    try
    {
-      rankTable = readRankTable(rankFilename);
+      if (logFilename != "")
+         logOpen(logFilename);
 
-      maxMinimizer = (maxRank / 100) * numKmers(rankTable->k);
+      // open all FASTQ and Bam input files to verify they exist and are as expected
 
-      StringVector annotationHeading;
-
-      patternVector = readPatterns(patternFilename, annotationHeading);
-
-      if (patternVector->size() == 0)
-         throw std::runtime_error("no patterns in " + patternFilename);
-
-      writeHitHeadingLine(CURRENT_VERSION, annotationHeading);
-
-      patternMap = createPatternMap(patternVector, w, rankTable, maxMinimizer);
-
-      if (fastqFilename1 != "")
-         pairReader = new FastqPairReader(fastqFilename1, fastqFilename2);
-      else if (ifastqFilename != "")
-         pairReader = new InterleavedFastqPairReader(ifastqFilename);
-      else if (ubamFilename != "")
-         pairReader = new UbamPairReader(ubamFilename);
+      if (single == 1)
+         singleReader =
+            createSingleReader(fastqFilename1, fastqFilename2, ifastqFilename,
+                               ubamFilename, inputFilename);
       else
-         pairReader = createInputReader(inputFilename);
+         pairReader =
+            createPairReader(fastqFilename1, fastqFilename2, ifastqFilename,
+                             ubamFilename, inputFilename);
 
-      pairReader->open();
+      // now read the pattern set and k-mer rank table, and create the pattern index
+      StringVector annotationHeading;
+      patternVector = readPatterns(patternFilename, annotationHeading);
+      rankTable     = readRankTable(rankFilename);
+      maxMinimizer  = (maxRank / 100) * numKmers(rankTable->k) - 1;
+      patternMap    = createPatternMap(*patternVector, w, rankTable, maxMinimizer,
+                                       inPatternMap);
 
-      std::string **message = new std::string *[numThreads];
-      std::thread **thread  = new std::thread *[numThreads];
+      writeHitHeadingLine(std::cout, CURRENT_VERSION, annotationHeading);
+
+      String **message     = new String *[numThreads];
+      std::thread **thread = new std::thread *[numThreads];
 
       // start all threads
       for (int i = 0; i < numThreads; i++)
       {
-         message[i] = new std::string("");
+         message[i] = new String("");
 	 thread[i]  = new std::thread(threadWork, message[i]);
       }
 
@@ -517,9 +492,15 @@ int main(int argc, char *argv[])
          if (*message[i] != "")
             throw std::runtime_error(*message[i]);
 
-      pairReader->close();
+      writeReadCountLine(std::cout, numReads);
 
-      writeReadPairLine(numReadPairs);
+      if (single == 1)
+         singleReader->close();
+      else
+         pairReader->close();
+
+      if (logFilename != "")
+         logClose();
    }
    catch (const std::runtime_error& error)
    {

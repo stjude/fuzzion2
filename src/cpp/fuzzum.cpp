@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -14,12 +14,12 @@
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_NAME = FUZZUM + CURRENT_VERSION;
+const String VERSION_NAME = FUZZUM + CURRENT_VERSION;
 
-int minStrong  = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
+int minStrong = DEFAULT_MIN_STRONG; // minimum overlap for a strong match
 
-std::string id = "";                 // identifies the sample
-std::string groupColList = "";       // comma-separated list of group column headings
+String id = "";           // identifies the sample
+String groupColList = ""; // comma-separated list of group column headings
 
 //------------------------------------------------------------------------------------
 // showUsage() writes the program's usage to stderr
@@ -51,11 +51,11 @@ void showUsage(const char *progname)
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -75,7 +75,7 @@ bool parseArgs(int argc, char *argv[])
       return false; // unrecognized option
    }
 
-   return (id != "" && minStrong > 0);
+   return (id != "" && minStrong >= TRIMER_LEN);
 }
 
 //------------------------------------------------------------------------------------
@@ -85,19 +85,19 @@ bool parseArgs(int argc, char *argv[])
 void writePatternSummaries(const StringVector& annotationHeading,
                            const HitVector& hitVector)
 {
-   writeSummaryHeadingLine(CURRENT_VERSION, false, annotationHeading);
+   writeSummaryHeadingLine(std::cout, CURRENT_VERSION, false, annotationHeading);
 
    IntVector index;
    getPatternIndices(hitVector, index);
-   int numPatterns = index.size();
+   const int numPatterns = index.size();
 
    for (int i = 0; i < numPatterns; i++)
    {
-      int begin = index[i];
-      int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
+      const int begin = index[i];
+      const int end   = (i + 1 < numPatterns ? index[i + 1] : hitVector.size());
 
-      Summary *summary = summarizeHits(hitVector, begin, end, minStrong, id);
-      summary->write();
+      const Summary *summary = summarizeHits(hitVector, begin, end, minStrong, id);
+      summary->write(std::cout);
       delete summary;
    }
 }
@@ -105,25 +105,26 @@ void writePatternSummaries(const StringVector& annotationHeading,
 //------------------------------------------------------------------------------------
 // writeGroupSummaries() writes to stdout a summary of hits for each pattern group
 
-void writeGroupSummaries(GroupManager& groupManager)
+void writeGroupSummaries(const GroupManager& groupManager)
 {
-   writeSummaryHeadingLine(CURRENT_VERSION, true, groupManager.annotationHeading);
+   writeSummaryHeadingLine(std::cout, CURRENT_VERSION, true,
+                           groupManager.annotationHeading);
 
-   GroupMap& gmap = groupManager.gmap;
+   const GroupMap& gmap = groupManager.gmap;
 
-   for (GroupMap::iterator gpos = gmap.begin(); gpos != gmap.end(); ++gpos)
+   for (GroupMap::const_iterator gpos = gmap.cbegin(); gpos != gmap.cend(); ++gpos)
    {
-      Group& group = gpos->second;
+      const Group& group = gpos->second;
 
-      Summary *summary = group.summarize(minStrong, id);
-      summary->write();
+      const Summary *summary = group.summarize(minStrong, id);
+      summary->write(std::cout);
       delete summary;
    }
 }
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {
@@ -133,17 +134,18 @@ int main(int argc, char *argv[])
 
    try
    {
-      std::string  fuzzion2Version;
+      String       fuzzion2Version;
       StringVector annotationHeading;
       HitVector    hitVector;
+      uint64_t     numReads;
 
-      readHits(std::cin, fuzzion2Version, annotationHeading, hitVector);
+      readHits(std::cin, fuzzion2Version, annotationHeading, hitVector, numReads);
 
       if (groupColList == "")
          writePatternSummaries(annotationHeading, hitVector);
       else
       {
-         GroupManager groupManager(groupColList, annotationHeading, hitVector);
+         const GroupManager groupManager(groupColList, annotationHeading, hitVector);
 	 writeGroupSummaries(groupManager);
       }
    }

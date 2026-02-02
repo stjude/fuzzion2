@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -15,12 +15,6 @@
 
 typedef Kmer KmerRank;
 
-inline double kmerRankPercentile(KmerLength k, KmerRank rank)
-{
-   return (k <= MAX_KMER_LENGTH ?
-           (static_cast<double>(rank) / numKmers(k)) * 100.0 : -1.0);
-}
-
 //------------------------------------------------------------------------------------
 
 class KmerRankTable // a lookup table holding a rank for each k-mer
@@ -30,33 +24,15 @@ public:
 
    virtual ~KmerRankTable() { delete[] rank; }
 
-   void writeText(const std::string& textFilename) const;
+   void writeText(const String& textFilename) const;
+   void writeBinary(const String& binaryFilename) const;
 
-   void writeBinary(const std::string& binaryFilename) const;
-
-   KmerLength  k;    // length of each k-mer
-   KmerRank   *rank; // lookup table indexed by k-mer
+   const KmerLength k; // length of each k-mer
+   KmerRank *rank;     // lookup table indexed by k-mer
 };
 
-KmerRankTable *readRankTable(const std::string& binaryFilename);
+KmerRankTable *readRankTable(const String& binaryFilename);
 
-KmerRankTable *createRankTable(KmerLength k, const std::string& refGenFilename);
+KmerRankTable *createRankTable(KmerLength k, const String& refGenFilename);
 
-//------------------------------------------------------------------------------------
-
-class KmerRankInverter // a lookup table holding a k-mer for each rank
-{
-public:
-   KmerRankInverter(const KmerRankTable *rankTable);
-
-   virtual ~KmerRankInverter() { delete[] kmer; }
-
-   void getKmers(const std::string& rank,
-                 std::string& kmer1, std::string& kmer2) const;
-
-   KmerLength  k;    // length of each k-mer
-   Kmer       *kmer; // lookup table indexed by rank
-};
-
-//------------------------------------------------------------------------------------
 #endif

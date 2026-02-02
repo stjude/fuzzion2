@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -17,7 +17,7 @@
 #define bam1_ptr ((bam1_t *)aptr)
 #define data_ptr ((InternalData *)rptr)
 
-typedef std::map<std::string, int> RefMap; // refName, refID
+typedef std::map<String, int> RefMap; // refName, refID
 
 //------------------------------------------------------------------------------------
 
@@ -25,18 +25,19 @@ class InternalData
 {
 public:
    InternalData()
-      : filename(""), file(NULL), header(NULL), refmap(), index(NULL), iter(NULL) { }
+      : filename(""), file(nullptr), header(nullptr), refmap(), index(nullptr),
+	iter(nullptr) { }
 
    virtual ~InternalData() { reinitialize(); }
 
    void reinitialize();
 
-   std::string  filename;
-   htsFile     *file;
-   bam_hdr_t   *header;
-   RefMap       refmap;
-   hts_idx_t   *index;
-   hts_itr_t   *iter;
+   String     filename;
+   htsFile   *file;
+   bam_hdr_t *header;
+   RefMap     refmap;
+   hts_idx_t *index;
+   hts_itr_t *iter;
 };
 
 //------------------------------------------------------------------------------------
@@ -45,10 +46,10 @@ public:
 
 void InternalData::reinitialize()
 {
-   if (iter)   { hts_itr_destroy(iter);   iter   = NULL; }
-   if (index)  { hts_idx_destroy(index);  index  = NULL; }
-   if (header) { bam_hdr_destroy(header); header = NULL; }
-   if (file)   { hts_close(file);         file   = NULL; }
+   if (iter)   { hts_itr_destroy(iter);   iter   = nullptr; }
+   if (index)  { hts_idx_destroy(index);  index  = nullptr; }
+   if (header) { bam_hdr_destroy(header); header = nullptr; }
+   if (file)   { hts_close(file);         file   = nullptr; }
 
    refmap.clear();
    filename = "";
@@ -75,9 +76,9 @@ BamRead::~BamRead()
 // BamRead::name() returns the name associated with this read; the caller is obligated
 // to de-allocate it
 
-std::string *BamRead::name() const
+String *BamRead::name() const
 {
-   return new std::string(bam_get_qname(bam1_ptr));
+   return new String(bam_get_qname(bam1_ptr));
 }
 
 //------------------------------------------------------------------------------------
@@ -217,7 +218,7 @@ int BamRead::refID() const
 
 int BamRead::position() const
 {
-   return bam1_ptr->core.pos + 1;
+   return (bam1_ptr->core.pos + 1);
 }
 
 //------------------------------------------------------------------------------------
@@ -249,7 +250,7 @@ int BamRead::numCigarOps() const
 // BamRead::cigarOp() returns the operation character (one of MIDNSHP=XB) and length
 // for the CIGAR operation at the specified index
 
-void BamRead::cigarOp(int index, char& op, int& len) const
+void BamRead::cigarOp(const int index, char& op, int& len) const
 {
    if (index >= 0 && index < numCigarOps())
    {
@@ -279,7 +280,7 @@ int BamRead::mateRefID() const
 
 int BamRead::matePosition() const
 {
-   return bam1_ptr->core.mpos + 1;
+   return (bam1_ptr->core.mpos + 1);
 }
 
 //------------------------------------------------------------------------------------
@@ -302,12 +303,12 @@ int BamRead::length() const
 // BamRead::sequence() returns the read sequence; the caller is obligated to
 // de-allocate it
 
-std::string *BamRead::sequence() const
+String *BamRead::sequence() const
 {
    const uint8_t *qseq = bam_get_seq(bam1_ptr);
 
-   int readlen = length();
-   std::string *seq = new std::string(readlen, ' ');
+   const int readlen = length();
+   String *seq = new String(readlen, ' ');
 
    for (int i = 0; i < readlen; i++)
       (*seq)[i] = seq_nt16_str[bam_seqi(qseq, i)];
@@ -319,12 +320,12 @@ std::string *BamRead::sequence() const
 // BamRead::qualities() returns a string of ASCII quality scores; the caller is
 // obligated to de-allocate it
 
-std::string *BamRead::qualities() const
+String *BamRead::qualities() const
 {
    const uint8_t *phred = bam_get_qual(bam1_ptr);
 
-   int readlen = length();
-   std::string *ascii = new std::string(readlen, ' ');
+   const int readlen = length();
+   String *ascii = new String(readlen, ' ');
 
    for (int i = 0; i < readlen; i++)
       (*ascii)[i] = phred[i] + 33;
@@ -353,7 +354,7 @@ BamReader::~BamReader()
 //------------------------------------------------------------------------------------
 // BamReader::open() opens the Bam file with the specified name
 
-void BamReader::open(const std::string& filename)
+void BamReader::open(const String& filename)
 {
    if (data_ptr->filename != "")
       throw std::runtime_error("attempt to open " + filename + " when " +
@@ -367,14 +368,12 @@ void BamReader::open(const std::string& filename)
    if (!(data_ptr->header = sam_hdr_read(data_ptr->file)))
       throw std::runtime_error("unable to read header in " + filename);
 
-   int numref = data_ptr->header->n_targets;
+   const int numref = data_ptr->header->n_targets;
 
    for (int refID = 0; refID < numref; refID++)
    {
-      std::string refName = data_ptr->header->target_name[refID];
-
-      if (data_ptr->refmap.find(refName) == data_ptr->refmap.end())
-         data_ptr->refmap.insert(std::make_pair(refName, refID));
+      const String refName = data_ptr->header->target_name[refID];
+      data_ptr->refmap[refName] = refID;
    }
 }
 
@@ -391,11 +390,11 @@ int BamReader::getNumRef() const
 // BamReader::getRefID() returns the ID of the reference sequence having the given
 // name; (-1) is returned if there is no reference sequence having the given name
 
-int BamReader::getRefID(const std::string& refName)
+int BamReader::getRefID(const String& refName) const
 {
-   RefMap::iterator refpos = data_ptr->refmap.find(refName);
+   RefMap::const_iterator refpos = data_ptr->refmap.find(refName);
 
-   return (refpos == data_ptr->refmap.end() ? -1 : refpos->second);
+   return (refpos == data_ptr->refmap.cend() ? -1 : refpos->second);
 }
 
 //------------------------------------------------------------------------------------
@@ -405,9 +404,9 @@ int BamReader::getRefID(const std::string& refName)
 // reference sequence name in the Bam file header, this function also checks to see if
 // the given name can be matched by removing or adding a "chr" prefix
 
-int BamReader::getRefIDAlt(const std::string& refName)
+int BamReader::getRefIDAlt(const String& refName) const
 {
-   int refID = getRefID(refName);
+   const int refID = getRefID(refName);
    if (refID >= 0)
       return refID;
 
@@ -417,12 +416,12 @@ int BamReader::getRefIDAlt(const std::string& refName)
        std::tolower(refName[1]) == 'h' && std::tolower(refName[2]) == 'r')
    {
       // try it without the "chr" prefix
-      std::string revisedRefName = refName.substr(3);
+      const String revisedRefName = refName.substr(3);
       return getRefID(revisedRefName);
    }
 
    // try it with the "chr" prefix
-   std::string revisedRefName = "chr" + refName;
+   const String revisedRefName = "chr" + refName;
    return getRefID(revisedRefName);
 }
 
@@ -430,7 +429,7 @@ int BamReader::getRefIDAlt(const std::string& refName)
 // BamReader::getRefLen() returns the length of the identified reference sequence or
 // (-1) if there is no file open or the reference ID is out of bounds
 
-int BamReader::getRefLen(int refID) const
+int BamReader::getRefLen(const int refID) const
 {
    if (data_ptr->header && refID >= 0 && refID < data_ptr->header->n_targets)
       return data_ptr->header->target_len[refID];
@@ -442,7 +441,7 @@ int BamReader::getRefLen(int refID) const
 // BamReader::getRefName() returns the name of the identified reference sequence or
 // "UNKNOWN" if there is no file open or the reference ID is out of bounds
 
-std::string BamReader::getRefName(int refID) const
+String BamReader::getRefName(const int refID) const
 {
    if (data_ptr->header && refID >= 0 && refID < data_ptr->header->n_targets)
       return data_ptr->header->target_name[refID];
@@ -454,7 +453,7 @@ std::string BamReader::getRefName(int refID) const
 // BamReader::jump() does a seek operation to the specified location in the Bam file;
 // the start position is assumed to be 1-based
 
-void BamReader::jump(int refID, int startPosition)
+void BamReader::jump(const int refID, const int startPosition)
 {
    if (!data_ptr->file)
       throw std::runtime_error("attempt to jump in Bam file that is not open");

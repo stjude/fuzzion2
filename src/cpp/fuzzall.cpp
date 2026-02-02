@@ -5,7 +5,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2023 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -15,9 +15,9 @@
 #include <iostream>
 #include <stdexcept>
 
-const std::string VERSION_NAME = "fuzzall " + CURRENT_VERSION;
+const String VERSION_NAME = "fuzzall " + CURRENT_VERSION;
 
-std::string  datasetName = "";
+String datasetName = "";
 StringVector fuzzumFilename;
 
 //------------------------------------------------------------------------------------
@@ -39,11 +39,11 @@ void showUsage(const char *progname)
 //------------------------------------------------------------------------------------
 // parseArgs() parses the command-line arguments and returns true if all are valid
 
-bool parseArgs(int argc, char *argv[])
+bool parseArgs(const int argc, const char *argv[])
 {
    for (int i = 1; i < argc; i++)
    {
-      std::string arg = argv[i];
+      const String arg = argv[i];
       if (arg.length() == 0)
          continue;
 
@@ -91,7 +91,7 @@ public:
 //------------------------------------------------------------------------------------
 // Stats::addValue() incorporates the given value into the statistics
 
-void Stats::addValue(int newValue)
+void Stats::addValue(const int newValue)
 {
    if (value.size() == 0)
       min = max = newValue;
@@ -110,7 +110,7 @@ void Stats::addValue(int newValue)
 
 double Stats::median()
 {
-   int n = value.size();
+   const int n = value.size();
 
    if (n == 0)
       return -1.0; // median is undefined for the empty set
@@ -129,7 +129,7 @@ double Stats::median()
 
 double Stats::mean() const
 {
-   int n = value.size();
+   const int n = value.size();
 
    if (n == 0)
       return -1.0; // mean is undefined for the empty set
@@ -152,7 +152,7 @@ void Stats::write()
 //------------------------------------------------------------------------------------
 // writeStatsHeadings() writes to stdout the headings for one set of statistics
 
-void writeStatsHeadings(std::string category)
+void writeStatsHeadings(const String& category)
 {
    std::cout << TAB << category
              << TAB << "min"
@@ -172,14 +172,14 @@ void writeHeadingLine(const StringVector& annotationHeading)
       std::cout << TAB << "dataset";
 
    writeStatsHeadings("distinct");
-   writeStatsHeadings("weak");
-   writeStatsHeadings("strong-");
-   writeStatsHeadings("strong+");
+   writeStatsHeadings(HIT_WEAK);
+   writeStatsHeadings(HIT_STRONG_NOSPAN);
+   writeStatsHeadings(HIT_STRONG_SPAN);
 
    std::cout << TAB << "IDs"
              << TAB << "ID list";
 
-   int numAnnotations = annotationHeading.size();
+   const int numAnnotations = annotationHeading.size();
 
    for (int i = 0; i < numAnnotations; i++)
       std::cout << TAB << annotationHeading[i];
@@ -191,9 +191,9 @@ void writeHeadingLine(const StringVector& annotationHeading)
 // writeDataLine() writes one line to stdout with the aggregate summary for one
 // pattern or group
 
-void writeDataLine(const std::string& name, Stats& distinctStats, Stats& weakStats,
-                   Stats& strongNospanStats, Stats& strongSpanStats, int numIDs,
-		   const std::string& idList, const StringVector& annotation)
+void writeDataLine(const String& name, Stats& distinctStats, Stats& weakStats,
+                   Stats& strongNospanStats, Stats& strongSpanStats, const int numIDs,
+		   const String& idList, const StringVector& annotation)
 {
    std::cout << name;
 
@@ -208,7 +208,7 @@ void writeDataLine(const std::string& name, Stats& distinctStats, Stats& weakSta
    std::cout << TAB << numIDs
              << TAB << idList;
 
-   int numAnnotations = annotation.size();
+   const int numAnnotations = annotation.size();
 
    for (int i = 0; i < numAnnotations; i++)
       std::cout << TAB << annotation[i];
@@ -221,20 +221,20 @@ void writeDataLine(const std::string& name, Stats& distinctStats, Stats& weakSta
 // stdout; the first summary is in summaryVector[start]; the return value is the index
 // of the first summary of the next pattern or group, or summaryVector.size() if none
 
-int aggregateOne(const SummaryVector& summaryVector, int start)
+int aggregateOne(const SummaryVector& summaryVector, const int start)
 {
-   const std::string& name = summaryVector[start]->name;
+   const String& name = summaryVector[start]->name;
    Stats distinctStats, weakStats, strongNospanStats, strongSpanStats;
    int numIDs = 0;
-   std::string idList = "";
+   String idList = "";
    const StringVector& annotation = summaryVector[start]->annotation;
 
-   int numSummaries = summaryVector.size();
+   const int numSummaries = summaryVector.size();
    int i = start;
 
    do
    {
-      const std::string& sampleID = summaryVector[i]->sampleID;
+      const String& sampleID = summaryVector[i]->sampleID;
       int numDistinct = 0, numWeak = 0, numStrongNospan = 0, numStrongSpan = 0;
 
       do
@@ -252,11 +252,13 @@ int aggregateOne(const SummaryVector& summaryVector, int start)
       strongNospanStats.addValue(numStrongNospan);
       strongSpanStats.addValue(numStrongSpan);
 
+      const int numStrong = numStrongNospan + numStrongSpan;
+
       if (++numIDs > 1)
          idList += ", ";
 
       idList += sampleID + "(" + intToString(numDistinct) + "/" +
-                intToString(numStrongSpan) + ")";
+                intToString(numStrong) + ")";
    }
    while (i < numSummaries && summaryVector[i]->name == name);
 
@@ -272,7 +274,7 @@ int aggregateOne(const SummaryVector& summaryVector, int start)
 
 void aggregateAll(const SummaryVector& summaryVector)
 {
-   int numSummaries = summaryVector.size();
+   const int numSummaries = summaryVector.size();
    int start = 0;
 
    while (start < numSummaries)
@@ -281,7 +283,7 @@ void aggregateAll(const SummaryVector& summaryVector)
 
 //------------------------------------------------------------------------------------
 
-int main(int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
    if (!parseArgs(argc, argv))
    {

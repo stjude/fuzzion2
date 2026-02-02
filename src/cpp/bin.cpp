@@ -4,7 +4,7 @@
 //
 // Author: Stephen V. Rice, Ph.D.
 //
-// Copyright 2022 St. Jude Children's Research Hospital
+// Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
 
@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------------
 // BinReader::BinReader() allocates the internal read buffer
 
-BinReader::BinReader(int bufferSize)
+BinReader::BinReader(const int bufferSize)
    : filename(""), fd(BINARY_FILE_NOT_OPEN), size(bufferSize), len(0), index(0),
      swap(false)
 {
@@ -28,7 +28,7 @@ BinReader::BinReader(int bufferSize)
 //------------------------------------------------------------------------------------
 // BinReader::open() opens the named binary file for reading
 
-void BinReader::open(const std::string& binFilename)
+void BinReader::open(const String& binFilename)
 {
    if (isOpen())
       close();
@@ -47,7 +47,7 @@ void BinReader::open(const std::string& binFilename)
 //------------------------------------------------------------------------------------
 // BinReader::seek() seeks to the specified byte offset
 
-void BinReader::seek(uint64_t byteOffset)
+void BinReader::seek(const uint64_t byteOffset)
 {
    if (!isOpen())
       throw std::runtime_error("attempt to seek in unopened binary file");
@@ -69,7 +69,7 @@ bool BinReader::fill()
    if (!isOpen())
       throw std::runtime_error("attempt to read from unopened binary file");
 
-   ssize_t bytes = read(fd, buf, size);
+   const ssize_t bytes = read(fd, buf, size);
 
    if (bytes == -1)
       throw std::runtime_error("error reading from " + filename);
@@ -94,7 +94,7 @@ bool BinReader::readBuffer(void *buffer, int numBytes)
       if (index >= len && !fill())
          return false;
 
-      int bytesToCopy = std::min(len - index, numBytes);
+      const int bytesToCopy = std::min(len - index, numBytes);
 
       std::memcpy(destination, &buf[index], bytesToCopy);
 
@@ -118,7 +118,7 @@ bool BinReader::skipBytes(int numBytes)
       if (index >= len && !fill())
          return false;
 
-      int bytesToSkip = std::min(len - index, numBytes);
+      const int bytesToSkip = std::min(len - index, numBytes);
 
       index    += bytesToSkip;
       numBytes -= bytesToSkip;
@@ -132,7 +132,7 @@ bool BinReader::skipBytes(int numBytes)
 // byte, but not more than maxlen characters; true is returned if successful; false
 // is returned if end-of-file was reached
 
-bool BinReader::readString(char *string, int maxlen)
+bool BinReader::readString(char *string, const int maxlen)
 {
    for (int i = 0; i < maxlen; i++)
    {
@@ -224,7 +224,7 @@ void BinReader::close()
 //------------------------------------------------------------------------------------
 // BinWriter::BinWriter() allocates the internal write buffer
 
-BinWriter::BinWriter(int bufferSize)
+BinWriter::BinWriter(const int bufferSize)
    : filename(""), fd(BINARY_FILE_NOT_OPEN), size(bufferSize), index(0), flushed(0)
 {
    buf = new uint8_t[size];
@@ -234,7 +234,7 @@ BinWriter::BinWriter(int bufferSize)
 // BinWriter::open() opens the named binary file for writing; if newFile is true,
 // a new file is created; otherwise, an existing file is opened for writing
 
-void BinWriter::open(const std::string& binFilename, bool newFile)
+void BinWriter::open(const String& binFilename, const bool newFile)
 {
    if (isOpen())
       close();
@@ -265,9 +265,7 @@ void BinWriter::flush()
    if (index == 0) // nothing to flush
       return;
 
-   ssize_t bytes = write(fd, buf, index);
-
-   if (bytes != index)
+   if (write(fd, buf, index) != index)
       throw std::runtime_error("error writing to " + filename);
 
    flushed += index;
@@ -287,7 +285,7 @@ void BinWriter::writeBuffer(const void *buffer, int numBytes)
       if (index >= size)
          flush();
 
-      int bytesToCopy = std::min(size - index, numBytes);
+      const int bytesToCopy = std::min(size - index, numBytes);
 
       std::memcpy(&buf[index], source, bytesToCopy);
 
@@ -361,7 +359,7 @@ void BinWriter::close()
 //------------------------------------------------------------------------------------
 // swapBytes() swaps the byte ordering of an unsigned integer of the specified length
 
-void swapBytes(void *buffer, int numBytes)
+void swapBytes(void *buffer, const int numBytes)
 {
    uint8_t *byteArray = static_cast<uint8_t *>(buffer);
 
@@ -370,7 +368,7 @@ void swapBytes(void *buffer, int numBytes)
 
    while (i < j)
    {
-      uint8_t byte = byteArray[i];
+      const uint8_t byte = byteArray[i];
       byteArray[i] = byteArray[j];
       byteArray[j] = byte;
 
