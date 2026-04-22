@@ -10,10 +10,7 @@
 
 #include "pattern.h"
 #include "window.h"
-#include <cstring>
-#include <fstream>
 #include <set>
-#include <stdexcept>
 
 const String PATTERN_HEADING  = "pattern";
 const String SEQUENCE_HEADING = "sequence";

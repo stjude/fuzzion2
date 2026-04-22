@@ -9,11 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "hit.h"
-#include <algorithm>
-#include <cstring>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 
 const String PATTERN   = "pattern ";
 const String READ      = "read ";

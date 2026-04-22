@@ -9,11 +9,7 @@
 //------------------------------------------------------------------------------------
 
 #include "util.h"
-#include <fstream>
-#include <limits>
 #include <mutex>
-#include <sstream>
-#include <stdexcept>
 
 std::ofstream *logfile = nullptr; // is non-null when the log file is open
 std::mutex     logMutex; // enforces mutual exclusion when writing to log file

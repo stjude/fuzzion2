@@ -9,9 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "read.h"
-#include <cctype>
-#include <cstring>
-#include <stdexcept>
 
 const String UNPAIRED_MESSAGE = "; use -single=1 for unpaired reads";
 const int INITIAL_READS = 100; // #initial reads to get when opening a file

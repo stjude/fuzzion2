@@ -10,9 +10,6 @@
 
 #include "bamread.h"
 #include "htslib/sam.h"
-#include <cstring>
-#include <map>
-#include <stdexcept>
 
 #define bam1_ptr ((bam1_t *)aptr)
 #define data_ptr ((InternalData *)rptr)

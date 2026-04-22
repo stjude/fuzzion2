@@ -11,10 +11,6 @@
 
 #include "hit.h"
 #include "version.h"
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <stdexcept>
 
 const String VERSION_NAME = "fuzzhop " + CURRENT_VERSION;
 

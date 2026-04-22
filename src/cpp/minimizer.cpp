@@ -9,7 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "minimizer.h"
-#include <stdexcept>
 
 //------------------------------------------------------------------------------------
 // MinimizerFinder::MinimizerFinder() checks for a valid window length and initializes

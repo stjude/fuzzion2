@@ -11,8 +11,6 @@
 
 #include "group.h"
 #include "version.h"
-#include <iostream>
-#include <stdexcept>
 
 const String VERSION_NAME = FUZZUM + CURRENT_VERSION;
 

@@ -13,8 +13,6 @@
 
 #include "pattern.h"
 #include "window.h"
-#include <cmath>
-#include <map>
 
 const char SPACER = '-'; // spacer symbol used in alignment visualization
 

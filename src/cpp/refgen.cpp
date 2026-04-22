@@ -9,7 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "refgen.h"
-#include <stdexcept>
 
 const uint32_t TWO_BIT_SIGNATURE_NOSWAP = 0x1A412743;
 const uint32_t TWO_BIT_SIGNATURE_SWAP   = 0x4327411A;

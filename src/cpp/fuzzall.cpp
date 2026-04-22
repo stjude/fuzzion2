@@ -11,9 +11,6 @@
 
 #include "summary.h"
 #include "version.h"
-#include <algorithm>
-#include <iostream>
-#include <stdexcept>
 
 const String VERSION_NAME = "fuzzall " + CURRENT_VERSION;
 

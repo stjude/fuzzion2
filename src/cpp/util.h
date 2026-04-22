@@ -11,6 +11,17 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <map>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 

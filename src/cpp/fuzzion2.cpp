@@ -12,9 +12,7 @@
 #include "hit.h"
 #include "read.h"
 #include "version.h"
-#include <iostream>
 #include <mutex>
-#include <stdexcept>
 #include <thread>
 
 const String VERSION_NAME = FUZZION2 + CURRENT_VERSION;

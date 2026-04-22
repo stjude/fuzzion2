@@ -9,7 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "match.h"
-#include <cstring>
 
 const char BLANK      = ' ';
 const int  PENALTY    = 3;    // penalty charged for each mismatched base in scoring

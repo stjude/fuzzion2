@@ -12,7 +12,6 @@
 #define GROUP_H
 
 #include "summary.h"
-#include <map>
 
 typedef std::map<String, HitVector> ReadMap; // key is read1 name
 

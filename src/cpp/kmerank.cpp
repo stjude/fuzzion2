@@ -11,8 +11,6 @@
 
 #include "rank.h"
 #include "version.h"
-#include <iostream>
-#include <stdexcept>
 
 const String VERSION_NAME = "kmerank " + CURRENT_VERSION;
 

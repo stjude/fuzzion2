@@ -9,9 +9,7 @@
 //------------------------------------------------------------------------------------
 
 #include "bin.h"
-#include <cstring>
 #include <fcntl.h>
-#include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
 

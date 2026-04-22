@@ -9,11 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "summary.h"
-#include <algorithm>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
 
 // column headings
 const String TOTAL     = "total";

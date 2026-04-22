@@ -10,9 +10,6 @@
 
 #include "rank.h"
 #include "refgen.h"
-#include <algorithm>
-#include <fstream>
-#include <stdexcept>
 
 const uint32_t RANK_FILE_SIGNATURE_NOSWAP = 0x17D26E39;
 const uint32_t RANK_FILE_SIGNATURE_SWAP   = 0x396ED217;

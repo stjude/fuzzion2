@@ -9,7 +9,6 @@
 //------------------------------------------------------------------------------------
 
 #include "align.h"
-#include <algorithm>
 
 //------------------------------------------------------------------------------------
 // OriginCounter::incrementCount() increments the number of occurrences of the given

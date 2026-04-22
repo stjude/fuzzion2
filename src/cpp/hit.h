@@ -12,9 +12,6 @@
 #define HIT_H
 
 #include "match.h"
-#include <istream>
-#include <limits>
-#include <ostream>
 
 const String FUZZION2 = "fuzzion2 ";
 

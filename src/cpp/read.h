@@ -12,7 +12,6 @@
 #define READ_H
 
 #include "bamread.h"
-#include <cstdio>
 
 const int LINEBUF_LEN = 1000000; // accommodate a long read
 
