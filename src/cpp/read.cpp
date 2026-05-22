@@ -51,7 +51,7 @@ void FileReader::fileOpen()
 
    const int numInitial = initialName.size();
    if (numInitial == 0)
-      throw std::runtime_error("no reads in " + filename);
+      throw Error("no reads in " + filename);
 
    if (INITIAL_READS < 2 ||
        numInitial < INITIAL_READS && numInitial % 2 == 1 /* odd #reads in file */)
@@ -96,12 +96,12 @@ bool FileReader::getNextPair(String& name1, String& str1,
       return false; // reached end-of-file
 
    if (!getNextSingle(name2, str2))
-      throw std::runtime_error("odd #reads in " + filename + UNPAIRED_MESSAGE);
+      throw Error("odd #reads in " + filename + UNPAIRED_MESSAGE);
 
    // got two reads; we expect them to be mates of a pair
    if (!namesMatch(name1, name2))
-      throw std::runtime_error("mismatched read names " + name1 + " and " + name2 +
-                               " in " + filename + UNPAIRED_MESSAGE);
+      throw Error("mismatched read names " + name1 + " and " + name2 + " in " +
+                  filename + UNPAIRED_MESSAGE);
 
    return true;
 }
@@ -130,7 +130,7 @@ void FastqFileReader::open()
    }
 
    if (!fileHandle)
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 }
 
 //------------------------------------------------------------------------------------
@@ -140,8 +140,7 @@ void FastqFileReader::open()
 bool FastqFileReader::readNext(String& name, String& str)
 {
    if (!fileHandle)
-      throw std::runtime_error("attempt to read from unopened FASTQ file " +
-                               filename);
+      throw Error("attempt to read from unopened FASTQ file " + filename);
 
    if (!std::fgets(linebuf, LINEBUF_LEN, fileHandle))
       return false; // reached end-of-file
@@ -159,19 +158,19 @@ bool FastqFileReader::readNext(String& name, String& str)
       if (std::fgets(linebuf, LINEBUF_LEN, fileHandle))
       {
          i = 0;
-	 while ((ch = linebuf[i]) && !std::isspace(ch))
+         while ((ch = linebuf[i]) && !std::isspace(ch))
             i++;
 
-	 linebuf[i] = 0;
-	 str = linebuf;
+         linebuf[i] = 0;
+         str = linebuf;
 
-	 if (std::fgets(linebuf, LINEBUF_LEN, fileHandle) && linebuf[0] == '+' &&
+         if (std::fgets(linebuf, LINEBUF_LEN, fileHandle) && linebuf[0] == '+' &&
              std::fgets(linebuf, LINEBUF_LEN, fileHandle))
             return true;
       }
    }
 
-   throw std::runtime_error("unrecognized FASTQ file format in " + filename);
+   throw Error("unrecognized FASTQ file format in " + filename);
 }
 
 //------------------------------------------------------------------------------------
@@ -205,13 +204,13 @@ bool BamFileReader::readNext(String& name, String& str)
          if (!bamRead.isUnmapped() && bamRead.isSecondary())
             continue; // skip secondary alignment
 
-	 name = bamRead.constName();
+         name = bamRead.constName();
 
-	 const String *s = bamRead.sequence();
-	 str = *s;
-	 delete s;
+         const String *s = bamRead.sequence();
+         str = *s;
+         delete s;
 
-	 return true;
+         return true;
       }
       else
          return false; // reached end-of-file
@@ -240,7 +239,7 @@ bool SingleReader::getNext(String& name, String& str)
       if (fileVector[current]->getNextSingle(name, str))
          return true;
       else // reached the end of the current file
-         if (++current < numFiles) // there is anothe file; get its first read
+         if (++current < numFiles) // there is another file; get its first read
             return fileVector[current]->getNextSingle(name, str);
 
    return false; // reached the end of all files
@@ -279,7 +278,7 @@ PairReader::~PairReader()
 
 static bool getPair(FileReader *fileReader1, FileReader *fileReader2,
                     String& name1, String& str1,
-		    String& name2, String& str2)
+                    String& name2, String& str2)
 {
    if (!fileReader2)
       return fileReader1->getNextPair(name1, str1, name2, str2);
@@ -294,14 +293,13 @@ static bool getPair(FileReader *fileReader1, FileReader *fileReader2,
       if (namesMatch(name1, name2))
          return true;
       else
-         throw std::runtime_error("mismatched read names " +
-                                  name1 + " in " + fileReader1->filename + " and " +
-				  name2 + " in " + fileReader2->filename +
-				  UNPAIRED_MESSAGE);
+         throw Error("mismatched read names " +
+                     name1 + " in " + fileReader1->filename + " and " +
+                     name2 + " in " + fileReader2->filename + UNPAIRED_MESSAGE);
 
    // we reached the end of one file but not the other
-   throw std::runtime_error(fileReader1->filename + " and " + fileReader2->filename +
-                            " contain different #reads" + UNPAIRED_MESSAGE);
+   throw Error(fileReader1->filename + " and " + fileReader2->filename +
+               " contain different #reads" + UNPAIRED_MESSAGE);
 }
 
 //------------------------------------------------------------------------------------
@@ -348,7 +346,7 @@ void PairReader::close()
 
 SingleReader *createSingleReader(const String& fastq1, const String& fastq2,
                                  const String& ifastq, const String& ubam,
-				 const StringVector& filename)
+                                 const StringVector& filename)
 {
    FileVector  fileVector;
    FileReader *fileReader;
@@ -391,24 +389,24 @@ SingleReader *createSingleReader(const String& fastq1, const String& fastq2,
       {
          fileReader->fileOpen();
       }
-      catch (const std::runtime_error& error)
+      catch (const Error& error)
       {
          // must not be a Bam file
-	 delete fileReader;
-	 fileReader = nullptr;
+         delete fileReader;
+         fileReader = nullptr;
       }
 
       if (!fileReader)
       {
          fileReader = new FastqFileReader(filename[i]);
-	 fileReader->fileOpen();
+         fileReader->fileOpen();
       }
 
       fileVector.push_back(fileReader);
    }
 
    if (fileVector.size() == 0)
-      throw std::runtime_error("no FASTQ or Bam file specified");
+      throw Error("no FASTQ or Bam file specified");
 
    return new SingleReader(fileVector);
 }
@@ -454,10 +452,10 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
          fileVector2.push_back(fileReader2);
       }
       else
-         throw std::runtime_error(fastq1 + " and " + fastq2 + " are incompatible");
+         throw Error(fastq1 + " and " + fastq2 + " are incompatible");
    }
    else if (fastq1 != "" || fastq2 != "")
-      throw std::runtime_error("unspecified FASTQ mate file" + UNPAIRED_MESSAGE);
+      throw Error("unspecified FASTQ mate file" + UNPAIRED_MESSAGE);
 
    if (ifastq != "")
    {
@@ -470,8 +468,7 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
          fileVector2.push_back(nullptr);
       }
       else
-         throw std::runtime_error("mates are not consecutive in " + ifastq +
-                                  UNPAIRED_MESSAGE);
+         throw Error("mates are not consecutive in " + ifastq + UNPAIRED_MESSAGE);
    }
 
    if (ubam != "")
@@ -485,8 +482,7 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
          fileVector2.push_back(nullptr);
       }
       else
-         throw std::runtime_error("mates are not consecutive in " + ubam +
-                                  UNPAIRED_MESSAGE);
+         throw Error("mates are not consecutive in " + ubam + UNPAIRED_MESSAGE);
    }
 
    FileVector unpaired;
@@ -500,11 +496,11 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
       {
          fileReader1->fileOpen();
       }
-      catch (const std::runtime_error& error)
+      catch (const Error& error)
       {
          // must not be a Bam file
-	 delete fileReader1;
-	 fileReader1 = nullptr;
+         delete fileReader1;
+         fileReader1 = nullptr;
       }
 
       if (fileReader1) // this is a Bam file
@@ -514,8 +510,8 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
             fileVector2.push_back(nullptr);
          }
          else
-            throw std::runtime_error("mates are not consecutive in " + filename[i] +
-                                     UNPAIRED_MESSAGE);
+            throw Error("mates are not consecutive in " + filename[i] +
+                        UNPAIRED_MESSAGE);
       else // this is not a Bam file
       {
          fileReader1 = new FastqFileReader(filename[i]);
@@ -526,7 +522,7 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
             fileVector1.push_back(fileReader1);
             fileVector2.push_back(nullptr);
          }
-	 else
+         else
             unpaired.push_back(fileReader1);
       }
 
@@ -540,26 +536,26 @@ PairReader *createPairReader(const String& fastq1, const String& fastq2,
 
       for (int i = 0; i < numUnpaired; i++)
          if (!paired[i])
-	 {
+         {
             for (int j = i + 1; j < numUnpaired; j++)
                if (!paired[j] && pairable(unpaired[i], unpaired[j]))
-	       {
+               {
                   paired[i] = true;
-		  paired[j] = true;
+                  paired[j] = true;
 
-		  fileVector1.push_back(unpaired[i]);
-		  fileVector2.push_back(unpaired[j]);
-		  break;
-	       }
+                  fileVector1.push_back(unpaired[i]);
+                  fileVector2.push_back(unpaired[j]);
+                  break;
+               }
 
-	    if (!paired[i])
-               throw std::runtime_error("no FASTQ mate file for " +
-                                        unpaired[i]->filename + UNPAIRED_MESSAGE);
-	 }
+            if (!paired[i])
+               throw Error("no FASTQ mate file for " + unpaired[i]->filename +
+                           UNPAIRED_MESSAGE);
+         }
    }
 
    if (fileVector1.size() == 0)
-      throw std::runtime_error("no FASTQ or Bam file specified");
+      throw Error("no FASTQ or Bam file specified");
 
    return new PairReader(fileVector1, fileVector2);
 }

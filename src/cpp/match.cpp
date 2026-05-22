@@ -13,6 +13,7 @@
 const char BLANK      = ' ';
 const int  PENALTY    = 3;    // penalty charged for each mismatched base in scoring
 const int  MISALIGNED = 9999; // value to indicate read2 is misaligned ahead of read1
+const int  MAXMIDDLE  = 10;   // max length of middle extension for hotspot pattern
 
 //------------------------------------------------------------------------------------
 // computeScore() returns the score for the given number of possible and actual
@@ -151,7 +152,7 @@ static bool leftCheck(const Align& left, char base, bool insertion)
 
 //------------------------------------------------------------------------------------
 // SingleMatch::leftRightQual() returns the qualification indicator for a spanning
-// match of a pattern of this type: left(ex)right
+// match of a pattern of this type: left<in>right or left(ex)right
 
 MatchQual SingleMatch::leftRightQual(const Pattern& pattern)
 {
@@ -159,7 +160,9 @@ MatchQual SingleMatch::leftRightQual(const Pattern& pattern)
    const int   mlen = middle->sub2.len;
    const int   n    = pattern.xvector->size();
 
-   // look for an exact match of an excluded middle
+   const bool  inclusion = (pattern.sequence[pattern.delim1] == '<');
+
+   // look for an exact match of an extra sequence
    for (int i = 0; i < n; i++)
    {
       const Seq&  xseq = (*pattern.xvector)[i];
@@ -168,14 +171,14 @@ MatchQual SingleMatch::leftRightQual(const Pattern& pattern)
 
       if (xlen == mlen     && std::strncmp(x, m, xlen) == 0 ||
           xlen == mlen + 1 && std::strncmp(&x[1], m, mlen) == 0 &&
-	  leftCheck(*left, x[0], true) ||
-	  xlen == mlen - 1 && std::strncmp(x, &m[1], xlen) == 0 &&
-	  leftCheck(*left, m[0], false))
-         return MatchQual::DISQUALIFIED;
+          leftCheck(*left, x[0], true) ||
+          xlen == mlen - 1 && std::strncmp(x, &m[1], xlen) == 0 &&
+          leftCheck(*left, m[0], false)) // found an exact match
+         return (inclusion ? MatchQual::QUALIFIED : MatchQual::DISQUALIFIED);
    }
 
-   // full match not found
-   return MatchQual::QUALIFIED;
+   // exact match not found
+   return (inclusion ? MatchQual::DISQUALIFIED : MatchQual::QUALIFIED);
 }
 
 //------------------------------------------------------------------------------------
@@ -196,7 +199,7 @@ void SingleMatch::setQual(const Pattern& pattern, const double minPercentAgreeme
       {
          qual = leftRightQual(pattern);
 
-	 if (qual == MatchQual::QUALIFIED &&
+         if (qual == MatchQual::QUALIFIED &&
              !spanning(minPercentAgreement, minOverlap))
             qual = MatchQual::UNDETERMINED;
       }
@@ -307,8 +310,8 @@ void SingleMatch::getVis(const Pattern& pattern, const int maxmidlen,
       {
          // append first delimiter to left visualization
          const char delim = pattern.sequence[pattern.delim1];
-	 lvis1 += delim;
-	 lvis2 += delim;
+         lvis1 += delim;
+         lvis2 += delim;
       }
 
       // may need to indicate ellide on the right if this is an unsided match
@@ -339,8 +342,8 @@ void SingleMatch::getVis(const Pattern& pattern, const int maxmidlen,
       {
          // prepend second delimiter to right visualization
          const char delim = pattern.sequence[pattern.delim2];
-	 rvis1 = delim + rvis1;
-	 rvis2 = delim + rvis2;
+         rvis1 = delim + rvis1;
+         rvis2 = delim + rvis2;
       }
    }
 
@@ -400,14 +403,13 @@ static void countOrigins(const TrimerOffsets& offsets1,
    int n1, n2;
 
    for (int t = 0; t < NUM_TRIMERS; t++) // for each 3-mer
-      if ((n1 = offsets1[t].size()) > 0 &&
-          (n2 = offsets2[t].size()) > 0)
+      if ((n1 = offsets1[t].size()) > 0 && (n2 = offsets2[t].size()) > 0)
          for (int i = 0; i < n1; i++)
             for (int j = 0; j < n2; j++)
-	    {
+            {
                const Origin origin = getOrigin(offsets1[t][i], offsets2[t][j]);
-	       ocounter.incrementCount(origin);
-	    }
+               ocounter.incrementCount(origin);
+            }
 }
 
 //------------------------------------------------------------------------------------
@@ -433,46 +435,46 @@ static void saveLeftExtend(const Align *left, const Pattern& pattern,
       if (maxCount > 0)
       {
          const Sub patternSub(*pattern.right);
-	 OriginVector ovector;
-	 const int numOrigins = ocounter.retrieveOrigins(maxCount - 2, ovector);
+         OriginVector ovector;
+         const int numOrigins = ocounter.retrieveOrigins(maxCount - 2, ovector);
 
-	 for (int i = 0; i < numOrigins; i++)
-	 {
-	    int begin1, begin2, len, lbases1, lbases2, rbases1, rbases2;
-	    getOverlap(patternSub, afterSub, ovector[i], begin1, begin2, len,
+         for (int i = 0; i < numOrigins; i++)
+         {
+            int begin1, begin2, len, lbases1, lbases2, rbases1, rbases2;
+            getOverlap(patternSub, afterSub, ovector[i], begin1, begin2, len,
                        lbases1, lbases2, rbases1, rbases2);
-	    if (begin1 > len)
+            if (begin1 > len)
                continue; // too many deletions at left end of pattern right
 
-	    const Sub ovSub1(patternSub.seq, begin1, len);
-	    const Sub ovSub2(afterSub.seq,   begin2, len);
+            const Sub ovSub1(patternSub.seq, begin1, len);
+            const Sub ovSub2(afterSub.seq,   begin2, len);
 
-	    const int minMatches = std::max(static_cast<int>(TRIMER_LEN), len - 5);
+            const int minMatches = std::max(static_cast<int>(TRIMER_LEN), len - 5);
 
-	    Align *right = alignSubstrings(ovSub1, ovSub2, minMatches);
-	    if (right)
-	    {
+            Align *right = alignSubstrings(ovSub1, ovSub2, minMatches);
+            if (right)
+            {
                right->adjust(lbases1, lbases2, rbases1, rbases2);
 
                const int deletions = right->sub1.begin;
-	       if (deletions > 0)
-	       {
+               if (deletions > 0)
+               {
                   // prepend deletions to alignment
-		  right->sub1.begin = 0;
-		  right->sub1.len  += deletions;
-		  right->vis1 = patternSub.seq.str.substr(0, deletions) + right->vis1;
-		  right->vis2 = String(deletions, SPACER) + right->vis2;
-	       }
+                  right->sub1.begin = 0;
+                  right->sub1.len  += deletions;
+                  right->vis1 = patternSub.seq.str.substr(0, deletions) + right->vis1;
+                  right->vis2 = String(deletions, SPACER) + right->vis2;
+               }
 
-	       saveLeftRight(left, right, pattern.middle, mvector);
-	       delete right;
-	    }
-	 }
+               saveLeftRight(left, right, pattern.middle, mvector);
+               delete right;
+            }
+         }
       }
    }
 
    // try extending to the middle only
-   Align *middle;
+   Align *middle = nullptr;
 
    if (pattern.middle)
    {
@@ -481,7 +483,7 @@ static void saveLeftExtend(const Align *left, const Pattern& pattern,
       const int minMatches = std::max(0, len - 5);
       middle = alignSubstrings(sub1, afterSub, minMatches);
    }
-   else // the pattern has no middle
+   else if (!pattern.xvector || afterSub.len <= MAXMIDDLE)
    {
       const Sub sub1(left->sub1.seq, left->sub1.len, 0); // zero-length substring
       middle = new Align(sub1, afterSub, "", afterSub.str());
@@ -517,46 +519,46 @@ static void saveRightExtend(const Align *right, const Pattern& pattern,
       if (maxCount > 0)
       {
          const Sub patternSub(*pattern.left);
-	 OriginVector ovector;
-	 const int numOrigins = ocounter.retrieveOrigins(maxCount - 2, ovector);
+         OriginVector ovector;
+         const int numOrigins = ocounter.retrieveOrigins(maxCount - 2, ovector);
 
-	 for (int i = 0; i < numOrigins; i++)
-	 {
-	    int begin1, begin2, len, lbases1, lbases2, rbases1, rbases2;
-	    getOverlap(patternSub, beforeSub, ovector[i], begin1, begin2, len,
+         for (int i = 0; i < numOrigins; i++)
+         {
+            int begin1, begin2, len, lbases1, lbases2, rbases1, rbases2;
+            getOverlap(patternSub, beforeSub, ovector[i], begin1, begin2, len,
                        lbases1, lbases2, rbases1, rbases2);
-	    if (patternSub.seq.len - (begin1 + len) > len)
+            if (patternSub.seq.len - (begin1 + len) > len)
                continue; // too many deletions at right end of pattern left
 
-	    const Sub ovSub1(patternSub.seq, begin1, len);
-	    const Sub ovSub2(beforeSub.seq,  begin2, len);
+            const Sub ovSub1(patternSub.seq, begin1, len);
+            const Sub ovSub2(beforeSub.seq,  begin2, len);
 
-	    const int minMatches = std::max(static_cast<int>(TRIMER_LEN), len - 5);
+            const int minMatches = std::max(static_cast<int>(TRIMER_LEN), len - 5);
 
-	    Align *left = alignSubstrings(ovSub1, ovSub2, minMatches);
-	    if (left)
-	    {
+            Align *left = alignSubstrings(ovSub1, ovSub2, minMatches);
+            if (left)
+            {
                left->adjust(lbases1, lbases2, rbases1, rbases2);
 
                const int deletions = patternSub.seq.len - left->sub1.end();
-	       if (deletions > 0)
-	       {
+               if (deletions > 0)
+               {
                   // append deletions to alignment
-		  left->sub1.len += deletions;
-		  left->vis1 +=
+                  left->sub1.len += deletions;
+                  left->vis1 +=
                      patternSub.seq.str.substr(patternSub.seq.len - deletions);
-		  left->vis2 += String(deletions, SPACER);
-	       }
+                  left->vis2 += String(deletions, SPACER);
+               }
 
-	       saveLeftRight(left, right, pattern.middle, mvector);
-	       delete left;
-	    }
-	 }
+               saveLeftRight(left, right, pattern.middle, mvector);
+               delete left;
+            }
+         }
       }
    }
 
    // try extending to the middle only
-   Align *middle;
+   Align *middle = nullptr;
 
    if (pattern.middle)
    {
@@ -566,7 +568,7 @@ static void saveRightExtend(const Align *right, const Pattern& pattern,
       const int minMatches = std::max(0, len - 5);
       middle = alignSubstrings(sub1, beforeSub, minMatches);
    }
-   else // the pattern has no middle
+   else if (!pattern.xvector || beforeSub.len <= MAXMIDDLE)
    {
       const Sub sub1(right->sub1.seq, 0, 0); // zero-length substring
       middle = new Align(sub1, beforeSub, "", beforeSub.str());
@@ -615,11 +617,11 @@ static void findMatches(AlignVector& lvector, AlignVector& rvector,
       if (!foundCompatible)
       {
          // try to extend alignments
-	 for (int i = 0; i < lcount; i++)
+         for (int i = 0; i < lcount; i++)
             if (lvector[i]->sub2.hasAfter())
                saveLeftExtend(lvector[i], pattern, mvector);
 
-	 for (int i = 0; i < rcount; i++)
+         for (int i = 0; i < rcount; i++)
             if (rvector[i]->sub2.hasBefore())
                saveRightExtend(rvector[i], pattern, mvector);
       }
@@ -642,10 +644,10 @@ static void findMatches(AlignVector& lvector, AlignVector& rvector,
 
 int getSingleMatches(const String& readStr, const MinimizerWindowLength w,
                      const KmerRankTable *rankTable, const Minimizer maxMinimizer,
-		     const PatternMap& pmap, const BoolVector& inPmap,
-		     const PatternVector& pvector, const double minPercentAgreement,
-		     const int minOverlap, Seq *& readSeq, SingleMatchMap& mmap,
-		     const SingleMatchMap *mateMap)
+                     const PatternMap& pmap, const BoolVector& inPmap,
+                     const PatternVector& pvector, const double minPercentAgreement,
+                     const int minOverlap, Seq *& readSeq, SingleMatchMap& mmap,
+                     const SingleMatchMap *mateMap)
 {
    WindowVector readWindowVector;
    getWindows(readStr.c_str(), readStr.length(), w, rankTable, readWindowVector);
@@ -687,7 +689,7 @@ int getSingleMatches(const String& readStr, const MinimizerWindowLength w,
       const int pindex = apos->first;
       const Pattern& pattern = *pvector[pindex];
       AlignDuo& aduo = apos->second;
-      SingleMatchVector mvector, mvectorAgree;
+      SingleMatchVector mvector;
 
       findMatches(aduo[0], aduo[1], pattern, mvector);
 
@@ -699,10 +701,10 @@ int getSingleMatches(const String& readStr, const MinimizerWindowLength w,
 
       for (int i = 0; i < count; i++)
          if (!mvector[i]->sufficientAgreement(minPercentAgreement))
-	 {
+         {
             delete mvector[i];
-	    mvector[i] = nullptr;
-	 }
+            mvector[i] = nullptr;
+         }
 
       // determine whether the remaining matches are qualified, undetermined, or
       // disqualifed
@@ -711,15 +713,15 @@ int getSingleMatches(const String& readStr, const MinimizerWindowLength w,
 
       for (int i = 0; i < count; i++)
          if (mvector[i])
-	 {
+         {
             mvector[i]->setQual(pattern, minPercentAgreement, minOverlap);
 
-	    if (mvector[i]->qual == MatchQual::DISQUALIFIED)
-	    {
+            if (mvector[i]->qual == MatchQual::DISQUALIFIED)
+            {
                foundDisqualified = true;
-	       break;
-	    }
-	 }
+               break;
+            }
+         }
 
       // if one is disqualified, all are disqualified; retain only those matches that
       // are qualified or undetermined
@@ -730,16 +732,16 @@ int getSingleMatches(const String& readStr, const MinimizerWindowLength w,
       else
       {
          SingleMatchVector mvectorAgree;
-	 for (int i = 0; i < count; i++)
+         for (int i = 0; i < count; i++)
             if (mvector[i])
                mvectorAgree.push_back(mvector[i]);
 
-	 const int numAgree = mvectorAgree.size();
-	 if (numAgree > 0)
-	 {
+         const int numAgree = mvectorAgree.size();
+         if (numAgree > 0)
+         {
             mmap.insert(std::make_pair(pindex, mvectorAgree));
-	    numMatches += numAgree;
-	 }
+            numMatches += numAgree;
+         }
       }
    }
 
@@ -770,17 +772,17 @@ void selectBestSingleMatches(const bool bestOverall, SingleMatchMap& mmap,
       for (int i = 0; i < count; i++)
          if (mvector[i]->qual == MatchQual::QUALIFIED &&
              (!best || mvector[i]->betterThan(*best)))
-	 {
+         {
             pindex = mpos->first;
-	    best   = mvector[i];
-	 }
+            best   = mvector[i];
+         }
 
       if (!bestOverall && best)
       {
          SingleMatchVector selected;
-	 selected.push_back(new SingleMatch(*best));
-	 bestMap.insert(std::make_pair(pindex, selected));
-	 best = nullptr; // reset for next pattern
+         selected.push_back(new SingleMatch(*best));
+         bestMap.insert(std::make_pair(pindex, selected));
+         best = nullptr; // reset for next pattern
       }
    }
 
@@ -813,7 +815,7 @@ void freeSingleMatchMap(SingleMatchMap& mmap)
 
 static void computePairStats(const Pattern& pattern, const SingleMatch& match1,
                              const SingleMatch& match2, int& insertSize,
-			     int& misalignment)
+                             int& misalignment)
 {
    if (!match1.left && match2.left)
    {
@@ -835,21 +837,21 @@ static void computePairStats(const Pattern& pattern, const SingleMatch& match1,
       if (match2.left)
       {
          begin2 = match2.left->origin();
-	 end2   = begin2 + match2.left->sub2.seq.len;
+         end2   = begin2 + match2.left->sub2.seq.len;
       }
       else // match2.right
       {
          if (match1.right)
             begin2 = begin1 + match2.right->origin() - match1.right->origin();
-	 else
-	 {
+         else
+         {
             const int mid1   = (match1.middle ? match1.middle->sub2.len : 0);
             const int mid2   = (match2.middle ? match2.middle->sub2.len : 0);
-	    const int maxmid = std::max(mid1, mid2);
-	    begin2 = pattern.left->len + maxmid + match2.right->origin();
-	 }
+            const int maxmid = std::max(mid1, mid2);
+            begin2 = pattern.left->len + maxmid + match2.right->origin();
+         }
 
-	 end2 = begin2 + match2.right->sub2.seq.len;
+         end2 = begin2 + match2.right->sub2.seq.len;
       }
    }
    else // there are right alignments and no left alignments
@@ -934,11 +936,11 @@ void PairMatch::setQual(const Pattern& pattern, const double minPercentAgreement
    if (pattern.right)
       if (std::max(match1->loverlap, match2->loverlap) >= minOverlap &&
           std::max(match1->roverlap, match2->roverlap) >= minOverlap &&
-	  sideAgreement(match1->left,  match2->left,  minPercentAgreement) &&
-	  sideAgreement(match1->right, match2->right, minPercentAgreement) &&
-	  (match1->qual == MatchQual::QUALIFIED ||
-	   match2->qual == MatchQual::QUALIFIED ||
-	   pattern.sequence[pattern.delim1] == ']'))
+          sideAgreement(match1->left,  match2->left,  minPercentAgreement) &&
+          sideAgreement(match1->right, match2->right, minPercentAgreement) &&
+          (match1->qual == MatchQual::QUALIFIED ||
+           match2->qual == MatchQual::QUALIFIED ||
+           pattern.sequence[pattern.delim1] == ']'))
          qual = MatchQual::QUALIFIED;
       else
          qual = MatchQual::DISQUALIFIED;
@@ -960,7 +962,7 @@ static Sub *appendVis(const Align *align1, const Align *align2, StringVector& vi
 {
    if (!align1 && !align2 ||
         align1 && align1->vis1.length() != align1->vis2.length() ||
-	align2 && align2->vis1.length() != align2->vis2.length())
+        align2 && align2->vis1.length() != align2->vis2.length())
       return nullptr; // this should never happen
 
    if (align1 && !align2) // only the first mate is aligned to the pattern
@@ -1005,20 +1007,20 @@ static Sub *appendVis(const Align *align1, const Align *align2, StringVector& vi
       if (p1 == SPACER || p2 == SPACER)
       {
          vis[0] += SPACER;
-	 vis[1] += (p1 == SPACER ? align1->vis2[i1++] : BLANK);
-	 vis[2] += (p2 == SPACER ? align2->vis2[i2++] : BLANK);
+         vis[1] += (p1 == SPACER ? align1->vis2[i1++] : BLANK);
+         vis[2] += (p2 == SPACER ? align2->vis2[i2++] : BLANK);
       }
       else
       {
          const char p = pstr[poffset++];
 
-	 if (p1 != BLANK && p1 != p ||
+         if (p1 != BLANK && p1 != p ||
              p2 != BLANK && p2 != p)
             return nullptr; // this should never happen
 
-	 vis[0] += p;
-	 vis[1] += (p1 == BLANK ? BLANK : align1->vis2[i1++]);
-	 vis[2] += (p2 == BLANK ? BLANK : align2->vis2[i2++]);
+         vis[0] += p;
+         vis[1] += (p1 == BLANK ? BLANK : align1->vis2[i1++]);
+         vis[2] += (p2 == BLANK ? BLANK : align2->vis2[i2++]);
       }
    }
 
@@ -1034,7 +1036,7 @@ static Sub *appendVis(const Align *align1, const Align *align2, StringVector& vi
 
 static void appendMiddleVis(const Pattern& pattern, const int maxmidlen,
                             const SingleMatch& match1, const SingleMatch& match2,
-			    StringVector& vis)
+                            StringVector& vis)
 {
    if (match1.middle && !match2.middle) // only the first mate's middle is aligned
    {
@@ -1064,7 +1066,7 @@ static void appendMiddleVis(const Pattern& pattern, const int maxmidlen,
    {
       const Sub *psub = appendVis(match1.middle, match2.middle, vis);
       if (!psub)
-         throw std::runtime_error("internal vis error");
+         throw Error("internal vis error");
 
       delete psub;
       return;
@@ -1116,25 +1118,25 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
    {
       const Sub *psub = appendVis(match1->left, match2->left, vis);
       if (!psub)
-         throw std::runtime_error("internal vis error");
+         throw Error("internal vis error");
 
       if (match1->middle || match1->right || match2->middle || match2->right)
       {
          if (psub->hasAfter())
-	 {
+         {
             const String after = psub->seq.str.substr(psub->end());
-	    const String blanks(after.length(), BLANK);
+            const String blanks(after.length(), BLANK);
 
-	    vis[0] += after;
-	    vis[1] += blanks;
-	    vis[2] += blanks;
-	 }
+            vis[0] += after;
+            vis[1] += blanks;
+            vis[2] += blanks;
+         }
 
-	 const char delim = pattern.sequence[pattern.delim1];
+         const char delim = pattern.sequence[pattern.delim1];
 
-	 vis[0] += delim;
-	 vis[1] += (match1->left && match1->middle ? delim : BLANK);
-	 vis[2] += (match2->left && match2->middle ? delim : BLANK);
+         vis[0] += delim;
+         vis[1] += (match1->left && match1->middle ? delim : BLANK);
+         vis[2] += (match2->left && match2->middle ? delim : BLANK);
       }
 
       if (psub->hasBefore() ||
@@ -1142,19 +1144,19 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
           match2->left && match2->left->sub2.hasBefore())
       {
          vis[0] = ellide(psub->hasBefore()) + vis[0];
-	 vis[1] = ellide(match1->left && match1->left->sub2.hasBefore()) + vis[1];
-	 vis[2] = ellide(match2->left && match2->left->sub2.hasBefore()) + vis[2];
+         vis[1] = ellide(match1->left && match1->left->sub2.hasBefore()) + vis[1];
+         vis[2] = ellide(match2->left && match2->left->sub2.hasBefore()) + vis[2];
       }
 
       // may need to indicate ellide on the right if this is an unsided match
       if (!match1->middle && !match1->right && !match2->middle && !match2->right &&
           (psub->hasAfter() ||
-	   match1->left->sub2.hasAfter() ||
-	   match2->left->sub2.hasAfter()))
+           match1->left->sub2.hasAfter() ||
+           match2->left->sub2.hasAfter()))
       {
          vis[0] += ellide(psub->hasAfter());
-	 vis[1] += ellide(match1->left->sub2.hasAfter());
-	 vis[2] += ellide(match2->left->sub2.hasAfter());
+         vis[1] += ellide(match1->left->sub2.hasAfter());
+         vis[2] += ellide(match2->left->sub2.hasAfter());
       }
 
       delete psub;
@@ -1176,9 +1178,9 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
       {
          const String blanks(mvis.length(), BLANK);
 
-	 vis[0] += mvis;
-	 vis[1] += blanks;
-	 vis[2] += blanks;
+         vis[0] += mvis;
+         vis[1] += blanks;
+         vis[2] += blanks;
       }
    }
 
@@ -1188,25 +1190,25 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
 
       const Sub *psub = appendVis(match1->right, match2->right, rvis);
       if (!psub)
-         throw std::runtime_error("internal vis error");
+         throw Error("internal vis error");
 
       if (match1->left || match1->middle || match2->left || match2->middle)
       {
          const char delim = pattern.sequence[pattern.delim2];
 
-	 vis[0] += delim;
-	 vis[1] += (match1->middle && match1->right ? delim : BLANK);
-	 vis[2] += (match2->middle && match2->right ? delim : BLANK);
+         vis[0] += delim;
+         vis[1] += (match1->middle && match1->right ? delim : BLANK);
+         vis[2] += (match2->middle && match2->right ? delim : BLANK);
 
-	 if (psub->hasBefore())
-	 {
+         if (psub->hasBefore())
+         {
             const String before = psub->seq.str.substr(0, psub->begin);
-	    const String blanks(before.length(), BLANK);
+            const String blanks(before.length(), BLANK);
 
-	    vis[0] += before;
-	    vis[1] += blanks;
-	    vis[2] += blanks;
-	 }
+            vis[0] += before;
+            vis[1] += blanks;
+            vis[2] += blanks;
+         }
       }
 
       if (psub->hasAfter() ||
@@ -1214,8 +1216,8 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
           match2->right && match2->right->sub2.hasAfter())
       {
          rvis[0] += ellide(psub->hasAfter());
-	 rvis[1] += ellide(match1->right && match1->right->sub2.hasAfter());
-	 rvis[2] += ellide(match2->right && match2->right->sub2.hasAfter());
+         rvis[1] += ellide(match1->right && match1->right->sub2.hasAfter());
+         rvis[2] += ellide(match2->right && match2->right->sub2.hasAfter());
       }
 
       delete psub;
@@ -1232,10 +1234,10 @@ void PairMatch::getVis(const Pattern& pattern, const int maxmidlen,
 
 static PairMatch *bestPairMatch(const Pattern& pattern,
                                 const double minPercentAgreement,
-				const int minOverlap, const int maxInsert,
-				const int maxTrim,
-				const SingleMatchVector& mvector1,
-				const SingleMatchVector& mvector2)
+                                const int minOverlap, const int maxInsert,
+                                const int maxTrim,
+                                const SingleMatchVector& mvector1,
+                                const SingleMatchVector& mvector2)
 {
    PairMatch *best = nullptr;
    const int count1 = mvector1.size();
@@ -1246,20 +1248,20 @@ static PairMatch *bestPairMatch(const Pattern& pattern,
       {
          PairMatch *candidate = new PairMatch(pattern, mvector1[i], mvector2[j]);
 
-	 if (candidate->isPlausible(maxInsert, maxTrim))
-	 {
+         if (candidate->isPlausible(maxInsert, maxTrim))
+         {
             candidate->setQual(pattern, minPercentAgreement, minOverlap);
 
-	    if (candidate->qual == MatchQual::QUALIFIED &&
+            if (candidate->qual == MatchQual::QUALIFIED &&
                 (!best || candidate->betterThan(*best)))
-	    {
+            {
                delete best;
-	       best = candidate;
-	    }
-	    else
+               best = candidate;
+            }
+            else
                delete candidate;
-	 }
-	 else
+         }
+         else
             delete candidate;
       }
 
@@ -1273,11 +1275,11 @@ static PairMatch *bestPairMatch(const Pattern& pattern,
 
 int getPairMatches(const String& readStr1, const String& readStr2,
                    const MinimizerWindowLength w, const KmerRankTable *rankTable,
-		   const Minimizer maxMinimizer, const PatternMap& pmap,
-		   const BoolVector& inPmap, const PatternVector& pvector,
-		   const double minPercentAgreement, const int minOverlap,
-		   const int maxInsert, const int maxTrim,
-		   Seq *& readSeq1, Seq *& readSeq2, PairMatchMap& pairMap)
+                   const Minimizer maxMinimizer, const PatternMap& pmap,
+                   const BoolVector& inPmap, const PatternVector& pvector,
+                   const double minPercentAgreement, const int minOverlap,
+                   const int maxInsert, const int maxTrim,
+                   Seq *& readSeq1, Seq *& readSeq2, PairMatchMap& pairMap)
 {
    SingleMatchMap mmap1, mmap2;
 
@@ -1289,7 +1291,7 @@ int getPairMatches(const String& readStr1, const String& readStr2,
 
    if (getSingleMatches(revcomp, w, rankTable, maxMinimizer, pmap, inPmap, pvector,
                         minPercentAgreement, minOverlap, readSeq2, mmap2,
-			&mmap1) == 0)
+                        &mmap1) == 0)
    {
       // there are no matches of read2, so discard the matches of read1
       freeSingleMatchMap(mmap1);
@@ -1346,7 +1348,7 @@ void selectBestPairMatch(PairMatchMap& pairMap, PairMatchMap& bestMap)
       if (!best || candidate->betterThan(*best))
       {
          pindex = ppos->first;
-	 best   = candidate;
+         best   = candidate;
       }
    }
 

@@ -16,6 +16,7 @@
 #include <thread>
 
 const String VERSION_NAME = FUZZION2 + CURRENT_VERSION;
+const String DOC_LINK     = "https://github.com/stjude/fuzzion2";
 
 const int    READ_BATCH_SIZE        = 10000; // number of reads in a full batch
 const int    MAX_MID_LEN            = 25;    // visualization parameter
@@ -84,7 +85,7 @@ void showUsage(const char *progname)
              << "name of pattern input file" << NEWLINE
       << "  -rank=filename      "
              << "name of binary  input file containing the k-mer rank table"
-	     << NEWLINE;
+      << NEWLINE;
 
    std::cerr
       << NEWLINE
@@ -105,31 +106,35 @@ void showUsage(const char *progname)
       << "   N is a numeric value, e.g., -threads=4" << NEWLINE
       << "  -maxins=N     "
              << "maximum insert size in bases. . . . . . . . . . . . default "
-	     << DEFAULT_MAX_INSERT << NEWLINE
+             << DEFAULT_MAX_INSERT << NEWLINE
       << "  -maxrank=N    "
              << "maximum rank percentile of minimizers . . . . . . . default "
              << doubleToString(DEFAULT_MAX_RANK) << NEWLINE
       << "  -maxtrim=N    "
              << "maximum bases second read aligned ahead of first. . default "
-	     << DEFAULT_MAX_TRIM << NEWLINE
+             << DEFAULT_MAX_TRIM << NEWLINE
       << "  -minbases=N   "
              << "minimum percentile of matching bases. . . . . . . . default "
-	     << doubleToString(DEFAULT_MIN_BASES) << NEWLINE
+             << doubleToString(DEFAULT_MIN_BASES) << NEWLINE
       << "  -minov=N      "
              << "minimum overlap in number of bases. . . . . . . . . default "
              << DEFAULT_MIN_OVERLAP << NEWLINE
       << "  -show=N       "
              << "show best only (1) or all patterns (0) that match . default "
-	     << DEFAULT_SHOW << NEWLINE
+             << DEFAULT_SHOW << NEWLINE
       << "  -single=N     "
              << "show single-read (1) or read-pair (0) matches . . . default "
-	     << DEFAULT_SINGLE << NEWLINE
+             << DEFAULT_SINGLE << NEWLINE
       << "  -threads=N    "
              << "number of threads . . . . . . . . . . . . . . . . . default "
-	     << DEFAULT_THREADS << NEWLINE
+             << DEFAULT_THREADS << NEWLINE
       << "  -w=N          "
              << "window length in number of bases. . . . . . . . . . default "
              << DEFAULT_WINDOW_LEN << NEWLINE;
+
+   std::cerr
+      << NEWLINE
+      << "For more information, see documentation at " << DOC_LINK << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -146,7 +151,7 @@ bool parseArgs(const int argc, const char *argv[])
       if (arg[0] != '-')
       {
          inputFilename.push_back(arg);
-	 continue;
+         continue;
       }
 
       // found an option
@@ -157,20 +162,20 @@ bool parseArgs(const int argc, const char *argv[])
 
       if (doubleOpt(opt, "maxrank",  maxRank)         ||
           doubleOpt(opt, "minbases", minBases)        ||
-	  intOpt   (opt, "maxins",   maxInsert)       ||
-	  intOpt   (opt, "maxtrim",  maxTrim)         ||
+          intOpt   (opt, "maxins",   maxInsert)       ||
+          intOpt   (opt, "maxtrim",  maxTrim)         ||
           intOpt   (opt, "minov",    minOverlap)      ||
           intOpt   (opt, "show",     show)            ||
-	  intOpt   (opt, "single",   single)          ||
-	  intOpt   (opt, "threads",  numThreads)      ||
+          intOpt   (opt, "single",   single)          ||
+          intOpt   (opt, "threads",  numThreads)      ||
           intOpt   (opt, "w",        w)               ||
-	  stringOpt(opt, "log",      logFilename)     || // log option for debugging
+          stringOpt(opt, "log",      logFilename)     || // log option for debugging
           stringOpt(opt, "pattern",  patternFilename) ||
-	  stringOpt(opt, "rank",     rankFilename)    ||
-	  stringOpt(opt, "fastq1",   fastqFilename1)  ||
-	  stringOpt(opt, "fastq2",   fastqFilename2)  ||
-	  stringOpt(opt, "ifastq",   ifastqFilename)  ||
-	  stringOpt(opt, "ubam",     ubamFilename))
+          stringOpt(opt, "rank",     rankFilename)    ||
+          stringOpt(opt, "fastq1",   fastqFilename1)  ||
+          stringOpt(opt, "fastq2",   fastqFilename2)  ||
+          stringOpt(opt, "ifastq",   ifastqFilename)  ||
+          stringOpt(opt, "ubam",     ubamFilename))
          continue;  // this option has been recognized
 
       return false; // unrecognized option
@@ -178,10 +183,10 @@ bool parseArgs(const int argc, const char *argv[])
 
    return (maxRank > 0.0 && maxRank <= 100.0 &&
            minBases >= 50.0 && minBases <= 100.0 &&
-	   maxInsert > 0 && maxTrim >= 0 && minOverlap >= TRIMER_LEN &&
-	   (show == 0 || show == 1) && (single == 0 || single == 1) &&
-	   numThreads > 0 && numThreads <= 64 && w > 0 && w < 256 &&
-	   patternFilename != "" && rankFilename != "");
+           maxInsert > 0 && maxTrim >= 0 && minOverlap >= TRIMER_LEN &&
+           (show == 0 || show == 1) && (single == 0 || single == 1) &&
+           numThreads > 0 && numThreads <= 64 && w > 0 && w < 256 &&
+           patternFilename != "" && rankFilename != "");
 }
 
 //------------------------------------------------------------------------------------
@@ -219,7 +224,7 @@ void processSingleRead(const String& readName, const String& readStr)
 
    if (getSingleMatches(readStr, w, rankTable, maxMinimizer, *patternMap,
                         *inPatternMap, *patternVector, minBases, minOverlap, readSeq,
-			mmap) == 0)
+                        mmap) == 0)
       return; // no matches
 
    SingleMatchMap bestMap;
@@ -258,7 +263,7 @@ void processReadPair(const String& readName1, const String& readStr1,
 
    if (getPairMatches(readStr1, readStr2, w, rankTable, maxMinimizer, *patternMap,
                       *inPatternMap, *patternVector, minBases, minOverlap, maxInsert,
-		      maxTrim, readSeq1, readSeq2, pairMap) == 0)
+                      maxTrim, readSeq1, readSeq2, pairMap) == 0)
       return; // no matches
 
    PairMatchMap bestMap;
@@ -278,7 +283,7 @@ void processReadPair(const String& readName1, const String& readStr1,
 
       Hit *hit = createHitFromPairMatch(pattern, MAX_MID_LEN, minBases, minOverlap,
                                         readName1, *readSeq1, readName2, *readSeq2,
-					*pairMatch);
+                                        *pairMatch);
       hitVector.push_back(hit);
    }
 
@@ -307,17 +312,17 @@ void processBatch(const int count, String& message,
          {
             processSingleRead(readName1[i], readStr1[i]);
 
-	    const String revcomp = stringReverseComplement(readStr1[i]);
-	    processSingleRead(readName1[i], revcomp);
-	 }
+            const String revcomp = stringReverseComplement(readStr1[i]);
+            processSingleRead(readName1[i], revcomp);
+         }
       else
          for (int i = 0; i < count; i++)
-	 {
+         {
             processReadPair(readName1[i], readStr1[i], readName2[i], readStr2[i]);
             processReadPair(readName2[i], readStr2[i], readName1[i], readStr1[i]);
-	 }
+         }
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       message = error.what();
 
@@ -356,13 +361,13 @@ int getBatch(const int batchSize, String& message,
             while (count < batchSize &&
                    singleReader->getNext(readName1[count], readStr1[count]))
                count++;
-	 else
+         else
             while (count < batchSize &&
                    pairReader->getNext(readName1[count], readStr1[count],
                                        readName2[count], readStr2[count]))
                count++;
       }
-      catch (const std::runtime_error& error) { message = error.what(); }
+      catch (const Error& error) { message = error.what(); }
 
       if (single == 1)
          numReads += count;
@@ -398,7 +403,7 @@ void threadWork(String *message)
       {
          count = getBatch(batchSize, *message, readName, readStr);
 
-	 if (*message == "" && count > 0)
+         if (*message == "" && count > 0)
             processBatch(count, *message, readName, readStr);
       }
       while (*message == "" && count == batchSize);
@@ -420,7 +425,7 @@ void threadWork(String *message)
          count = getBatch(batchSize, *message, readName1, readStr1, readName2,
                           readStr2);
 
-	 if (*message == "" && count > 0)
+         if (*message == "" && count > 0)
             processBatch(count, *message, readName1, readStr1, readName2, readStr2);
       }
       while (*message == "" && count == batchSize);
@@ -475,20 +480,20 @@ int main(const int argc, const char *argv[])
       for (int i = 0; i < numThreads; i++)
       {
          message[i] = new String("");
-	 thread[i]  = new std::thread(threadWork, message[i]);
+         thread[i]  = new std::thread(threadWork, message[i]);
       }
 
       // wait for each thread to finish
       for (int i = 0; i < numThreads; i++)
       {
          thread[i]->join();
-	 delete thread[i];
+         delete thread[i];
       }
 
       // all of the threads have finished; check for any exceptions
       for (int i = 0; i < numThreads; i++)
          if (*message[i] != "")
-            throw std::runtime_error(*message[i]);
+            throw Error(*message[i]);
 
       writeReadCountLine(std::cout, numReads);
 
@@ -500,7 +505,7 @@ int main(const int argc, const char *argv[])
       if (logFilename != "")
          logClose();
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       std::cerr << argv[0] << ": " << error.what() << std::endl;
       return 1;

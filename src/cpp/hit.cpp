@@ -65,7 +65,7 @@ static int findDelimiter(const String& patternVis)
 
    int i = 0;
    while (i < len && patternVis[i] != ']' && patternVis[i] != '}' &&
-          patternVis[i] != '(')
+          patternVis[i] != '<' && patternVis[i] != '(')
       i++;
 
    return i;
@@ -77,8 +77,8 @@ static int findDelimiter(const String& patternVis)
 
 Hit::Hit(const String& inPatternName, const String& inPatternVis,
          const int inPossible, const int inMatches, const int inSpanning,
-	 const int inInsertSize, const StringVector& inAnnotation,
-	 const HitRead *inRead1, const HitRead *inRead2)
+         const int inInsertSize, const StringVector& inAnnotation,
+         const HitRead *inRead1, const HitRead *inRead2)
    : patternName(inPatternName), patternVis(inPatternVis),
      delim1(findDelimiter(inPatternVis)), possible(inPossible), matches(inMatches),
      spanning(inSpanning), insertSize(inInsertSize), annotation(inAnnotation),
@@ -95,8 +95,8 @@ Hit::Hit(const String& inPatternName, const String& inPatternVis,
 
 Hit *createHitFromSingleMatch(const Pattern& pattern, const int maxmidlen,
                               const double minPercentAgreement, const int minOverlap,
-			      const String& readName, const Seq& readSeq,
-			      const SingleMatch& match)
+                              const String& readName, const Seq& readSeq,
+                              const SingleMatch& match)
 {
    String patternVis, readVis;
    match.getVis(pattern, maxmidlen, patternVis, readVis);
@@ -109,7 +109,7 @@ Hit *createHitFromSingleMatch(const Pattern& pattern, const int maxmidlen,
 
    HitRead *read = new HitRead(readName, readVis, match.possible, match.matches,
                                spanning, match.loverlap, match.roverlap, readSeq.len,
-			       computeHash(readSeq));
+                               computeHash(readSeq));
 
    return new Hit(pattern.name, patternVis, match.possible, match.matches, spanning,
                   0, pattern.annotation, read);
@@ -121,9 +121,9 @@ Hit *createHitFromSingleMatch(const Pattern& pattern, const int maxmidlen,
 
 Hit *createHitFromPairMatch(const Pattern& pattern, const int maxmidlen,
                             const double minPercentAgreement, const int minOverlap,
-			    const String& readName1, const Seq& readSeq1,
-			    const String& readName2, const Seq& readSeq2,
-			    const PairMatch& pairMatch)
+                            const String& readName1, const Seq& readSeq1,
+                            const String& readName2, const Seq& readSeq2,
+                            const PairMatch& pairMatch)
 {
    StringVector vis;
    pairMatch.getVis(pattern, maxmidlen, vis);
@@ -140,19 +140,19 @@ Hit *createHitFromPairMatch(const Pattern& pattern, const int maxmidlen,
 
    HitRead *read1 = new HitRead(readName1, vis[1], pairMatch.match1->possible,
                                 pairMatch.match1->matches, spanning1,
-				pairMatch.match1->loverlap,
-				pairMatch.match1->roverlap, readSeq1.len,
-				computeHash(readSeq1));
+                                pairMatch.match1->loverlap,
+                                pairMatch.match1->roverlap, readSeq1.len,
+                                computeHash(readSeq1));
 
    HitRead *read2 = new HitRead(readName2, vis[2], pairMatch.match2->possible,
                                 pairMatch.match2->matches, spanning2,
-				pairMatch.match2->loverlap,
-				pairMatch.match2->roverlap, readSeq2.len,
-				computeHash(readSeq2));
+                                pairMatch.match2->loverlap,
+                                pairMatch.match2->roverlap, readSeq2.len,
+                                computeHash(readSeq2));
 
    return new Hit(pattern.name, vis[0], pairMatch.possible, pairMatch.matches,
                   spanning1 + spanning2, pairMatch.insertSize, pattern.annotation,
-		  read1, read2);
+                  read1, read2);
 }
 
 //------------------------------------------------------------------------------------
@@ -256,13 +256,13 @@ void writeHitHeadingLine(std::ostream& ostream, const String& version,
    ostream << FUZZION2 << version
            << TAB << VIS
            << TAB << MATCHES
-	   << TAB << POSSIBLE
-	   << TAB << PERCENT
-	   << TAB << SPANNING
-	   << TAB << OVLEFT
-	   << TAB << OVRIGHT
-	   << TAB << ISIZE
-	   << TAB << HASH;
+           << TAB << POSSIBLE
+           << TAB << PERCENT
+           << TAB << SPANNING
+           << TAB << OVLEFT
+           << TAB << OVRIGHT
+           << TAB << ISIZE
+           << TAB << HASH;
 
    const int numAnnotations = annotationHeading.size();
 
@@ -357,15 +357,15 @@ void HitRead::write(std::ostream& ostream) const
 {
    ostream << READ << name
            << TAB << vis
-	   << TAB << matches
-	   << TAB << possible
-	   << TAB << doubleToString(100.0 * matches / possible)
-	   << TAB << spanning
-	   << TAB << loverlap
-	   << TAB << roverlap
-	   << TAB << len
-	   << TAB << hash
-	   << NEWLINE;
+           << TAB << matches
+           << TAB << possible
+           << TAB << doubleToString(100.0 * matches / possible)
+           << TAB << spanning
+           << TAB << loverlap
+           << TAB << roverlap
+           << TAB << len
+           << TAB << hash
+           << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -376,14 +376,14 @@ void Hit::write(std::ostream& ostream) const
 {
    ostream << PATTERN << patternName
            << TAB << patternVis
-	   << TAB << matches
-	   << TAB << possible
-	   << TAB << doubleToString(100.0 * matches / possible)
-	   << TAB << spanning
-	   << TAB // no entry in this column
-	   << TAB // no entry in this column
-	   << TAB << insertSize
-	   << TAB;// no entry in this column
+           << TAB << matches
+           << TAB << possible
+           << TAB << doubleToString(100.0 * matches / possible)
+           << TAB << spanning
+           << TAB // no entry in this column
+           << TAB // no entry in this column
+           << TAB << insertSize
+           << TAB;// no entry in this column
 
    const int numAnnotations = annotation.size();
 
@@ -492,16 +492,16 @@ static Hit *getHit(const String& line, const HitRead *read1,
 // caller's obligation to de-allocate them); duplicate hits are marked
 
 void readHits(std::istream& istream, String& version, StringVector& annotationHeading,
-	      HitVector& hitVector, uint64_t& numReads)
+              HitVector& hitVector, uint64_t& numReads)
 {
    numReads = 0;
    String headingLine, line;
 
    if (!getline(istream, headingLine))
-      throw std::runtime_error("no input");
+      throw Error("no input");
 
    if (!validHeadingLine(headingLine, version, annotationHeading))
-      throw std::runtime_error("unexpected heading line");
+      throw Error("unexpected heading line");
 
    if (!getline(istream, line))
       return; // no hits
@@ -510,53 +510,53 @@ void readHits(std::istream& istream, String& version, StringVector& annotationHe
       if (isHeadingLine(line)) // found another heading line
       {
          if (line != headingLine)
-            throw std::runtime_error("inconsistent heading lines");
+            throw Error("inconsistent heading lines");
 
-	 if (!getline(istream, line))
+         if (!getline(istream, line))
             break;
       }
       else if (isReadCountLine(line))
       {
          uint64_t readCount;
 
-	 if (validReadCountLine(line, readCount))
+         if (validReadCountLine(line, readCount))
             numReads += readCount;
-	 else
-            throw std::runtime_error("unexpected input line: " + line);
+         else
+            throw Error("unexpected input line: " + line);
 
-	 if (!getline(istream, line))
+         if (!getline(istream, line))
             break;
       }
       else // this must be a hit expressed on two or three lines
       {
          String rdline1, rdline2;
-	 HitRead *read1, *read2;
-	 Hit *hit = nullptr;
+         HitRead *read1, *read2;
+         Hit *hit = nullptr;
 
-	 if (isPatternLine(line)        && getline(istream, rdline1) &&
+         if (isPatternLine(line)        && getline(istream, rdline1) &&
              (read1 = getRead(rdline1)) && getline(istream, rdline2))
             if (isReadLine(rdline2)) // found a second read
-	    {
+            {
                if (read2 = getRead(rdline2))
                   hit = getHit(line, read1, read2);
-	    }
-	    else // only one read
+            }
+            else // only one read
                hit = getHit(line, read1);
 
-	 if (hit)
+         if (hit)
             if (hitVector.size() < MAX_HITS)
-	    {
+            {
                hitVector.push_back(hit);
 
-	       if (!hit->read2)
+               if (!hit->read2)
                   line = rdline2;
-	       else if (!getline(istream, line))
+               else if (!getline(istream, line))
                   break;
-	    }
-	    else
-               throw std::runtime_error("too many hits");
-	 else
-            throw std::runtime_error("unexpected hit format: " + line);
+            }
+            else
+               throw Error("too many hits");
+         else
+            throw Error("unexpected hit format: " + line);
       }
 
    if (hitVector.size() > 1)
@@ -586,8 +586,8 @@ void getPatternIndices(const HitVector& hitVector, IntVector& index)
 }
 
 //------------------------------------------------------------------------------------
-// maxVisLength() returns the maximum length of the visualization sequence for
-// the hits in the given vector, from indices begin (inclusive) to end (exclusive)
+// maxVisLength() returns the maximum length of the visualization sequence for the
+// hits in the given vector, from indices begin (inclusive) to end (exclusive)
 
 int maxVisLength(const HitVector& hitVector, const int begin, const int end)
 {

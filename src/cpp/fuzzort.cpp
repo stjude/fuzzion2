@@ -53,7 +53,7 @@ int main(const int argc, const char *argv[])
 
       writeReadCountLine(std::cout, numReads);
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       std::cerr << argv[0] << ": " << error.what() << std::endl;
       return 1;

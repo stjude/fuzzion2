@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// bamread.cpp - module providing functionality for reading Bam files; htslib is used
+// bamread.cpp - module for reading Bam files; htslib is used
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -23,7 +23,7 @@ class InternalData
 public:
    InternalData()
       : filename(""), file(nullptr), header(nullptr), refmap(), index(nullptr),
-	iter(nullptr) { }
+        iter(nullptr) { }
 
    virtual ~InternalData() { reinitialize(); }
 
@@ -236,7 +236,7 @@ int BamRead::mapQuality() const
 }
 
 //------------------------------------------------------------------------------------
-// BamRead::numCigarOps() returns the number of CIGAR operatiosn for this read
+// BamRead::numCigarOps() returns the number of CIGAR operations for this read
 
 int BamRead::numCigarOps() const
 {
@@ -354,16 +354,16 @@ BamReader::~BamReader()
 void BamReader::open(const String& filename)
 {
    if (data_ptr->filename != "")
-      throw std::runtime_error("attempt to open " + filename + " when " +
-                               data_ptr->filename + " is already open");
+      throw Error("attempt to open " + filename + " when " + data_ptr->filename +
+                  " is already open");
 
    data_ptr->filename = filename;
 
    if (!(data_ptr->file = hts_open(filename.c_str(), "r")))
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 
    if (!(data_ptr->header = sam_hdr_read(data_ptr->file)))
-      throw std::runtime_error("unable to read header in " + filename);
+      throw Error("unable to read header in " + filename);
 
    const int numref = data_ptr->header->n_targets;
 
@@ -453,24 +453,24 @@ String BamReader::getRefName(const int refID) const
 void BamReader::jump(const int refID, const int startPosition)
 {
    if (!data_ptr->file)
-      throw std::runtime_error("attempt to jump in Bam file that is not open");
+      throw Error("attempt to jump in Bam file that is not open");
 
    if (refID < 0 || refID >= data_ptr->header->n_targets || startPosition < 1)
-      throw std::runtime_error("invalid argument passed to BamReader::jump()");
+      throw Error("invalid argument passed to BamReader::jump()");
 
    if (!data_ptr->index &&
        (!(data_ptr->index = sam_index_load(data_ptr->file,
                                            data_ptr->filename.c_str()))))
-      throw std::runtime_error("unable to read index file for " + data_ptr->filename);
+      throw Error("unable to read index file for " + data_ptr->filename);
 
    if (data_ptr->iter)
       hts_itr_destroy(data_ptr->iter);
 
    if (!(data_ptr->iter = sam_itr_queryi(data_ptr->index, refID,
                                          startPosition - 1, // 0-based position
-					 getRefLen(refID))))
-      throw std::runtime_error("disk seek failed on reference sequence " +
-                               getRefName(refID) + " in " + data_ptr->filename);
+                                         getRefLen(refID))))
+      throw Error("disk seek failed on reference sequence " + getRefName(refID) +
+                  " in " + data_ptr->filename);
 }
 
 //------------------------------------------------------------------------------------
@@ -482,7 +482,7 @@ void BamReader::jump(const int refID, const int startPosition)
 bool BamReader::getNext(BamRead& read)
 {
    if (!data_ptr->file)
-      throw std::runtime_error("attempt to read from Bam file that is not open");
+      throw Error("attempt to read from Bam file that is not open");
 
    int status;
 
@@ -498,7 +498,7 @@ bool BamReader::getNext(BamRead& read)
       return false;
 
    // status < -1
-   throw std::runtime_error("error reading " + data_ptr->filename);
+   throw Error("error reading " + data_ptr->filename);
 }
 
 //------------------------------------------------------------------------------------

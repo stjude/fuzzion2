@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// minimizer.h - module defining classes for finding minimizers
+// minimizer.h - module for finding minimizers
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -24,12 +24,12 @@ inline int minimizerWindowID(const int startIndex,
 
 //------------------------------------------------------------------------------------
 
-class MinimizerFinder : public KmerFinder // abstract class for finding minimizers
-			                  // in a sequence
+class MinimizerFinder : public KmerFinder
+// abstract class for finding minimizers in a sequence
 {
 public:
    MinimizerFinder(const char *sequence, int sequenceLen, KmerLength kmerLen,
-		   MinimizerWindowLength windowLen);
+                   MinimizerWindowLength windowLen);
 
    virtual ~MinimizerFinder() { }
 
@@ -54,15 +54,15 @@ public:
 
 //------------------------------------------------------------------------------------
 
-class RankMinimizerFinder : public MinimizerFinder // abstract class for finding
-			                           // rank minimizers in a sequence
+class RankMinimizerFinder : public MinimizerFinder
+// abstract class for finding rank minimizers in a sequence
 {
 public:
    RankMinimizerFinder(const char *sequence, const int sequenceLen,
-		       const MinimizerWindowLength windowLen,
+                       const MinimizerWindowLength windowLen,
                        const KmerRankTable *rankTable)
       : MinimizerFinder(sequence, sequenceLen, rankTable->k, windowLen),
-	table(rankTable) { }
+        table(rankTable) { }
 
    virtual ~RankMinimizerFinder() { }
 

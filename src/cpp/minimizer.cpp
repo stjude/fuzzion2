@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// minimizer.cpp - module defining classes for finding minimizers
+// minimizer.cpp - module for finding minimizers
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -11,17 +11,16 @@
 #include "minimizer.h"
 
 //------------------------------------------------------------------------------------
-// MinimizerFinder::MinimizerFinder() checks for a valid window length and initializes
-// data members
+// MinimizerFinder::MinimizerFinder() checks for a valid window length
 
 MinimizerFinder::MinimizerFinder(const char *sequence, const int sequenceLen,
-		                 const KmerLength kmerLen,
+                                 const KmerLength kmerLen,
                                  const MinimizerWindowLength windowLen)
    : KmerFinder(sequence, sequenceLen, kmerLen), w(windowLen), currentWindowID(-1),
      currentMinimizer(0), currentStartIndex(-1)
 {
    if (w < 1)
-      throw std::runtime_error("invalid minimizer window length");
+      throw Error("invalid minimizer window length");
 }
 
 //------------------------------------------------------------------------------------
@@ -49,7 +48,7 @@ bool MinimizerFinder::reportKmer(const Kmer kmer, const int startIndex)
       if (kmerHash < currentMinimizer)
       {
          currentMinimizer  = kmerHash;
-	 currentStartIndex = startIndex;
+         currentStartIndex = startIndex;
       }
    }
    else // this is the first k-mer of a new window
@@ -59,8 +58,8 @@ bool MinimizerFinder::reportKmer(const Kmer kmer, const int startIndex)
                                    currentStartIndex, currentWindowID, false))
       {
          // discontinue the search
-	 currentWindowID = -1;
-	 return false;
+         currentWindowID = -1;
+         return false;
       }
 
       currentWindowID   = windowID;

@@ -47,7 +47,7 @@ bool parseArgs(const int argc, const char *argv[])
       if (arg[0] != '-')
       {
          fuzzumFilename.push_back(arg);
-	 continue;
+         continue;
       }
 
       StringVector opt;
@@ -56,9 +56,9 @@ bool parseArgs(const int argc, const char *argv[])
          return false; // incorrect option format
 
       if (stringOpt(opt, "dataset", datasetName))
-         continue;  // this option has been recognized
+         continue;     // this option has been recognized
 
-      return false; // unrecognized option
+      return false;    // unrecognized option
    }
 
    return (fuzzumFilename.size() > 0);
@@ -141,9 +141,9 @@ void Stats::write()
 {
    std::cout << TAB << sum
              << TAB << min
-	     << TAB << doubleToString(median())
-	     << TAB << doubleToString(mean())
-	     << TAB << max;
+             << TAB << doubleToString(median())
+             << TAB << doubleToString(mean())
+             << TAB << max;
 }
 
 //------------------------------------------------------------------------------------
@@ -153,9 +153,9 @@ void writeStatsHeadings(const String& category)
 {
    std::cout << TAB << category
              << TAB << "min"
-	     << TAB << "median"
-	     << TAB << "mean"
-	     << TAB << "max";
+             << TAB << "median"
+             << TAB << "mean"
+             << TAB << "max";
 }
 
 //------------------------------------------------------------------------------------
@@ -190,7 +190,7 @@ void writeHeadingLine(const StringVector& annotationHeading)
 
 void writeDataLine(const String& name, Stats& distinctStats, Stats& weakStats,
                    Stats& strongNospanStats, Stats& strongSpanStats, const int numIDs,
-		   const String& idList, const StringVector& annotation)
+                   const String& idList, const StringVector& annotation)
 {
    std::cout << name;
 
@@ -237,12 +237,12 @@ int aggregateOne(const SummaryVector& summaryVector, const int start)
       do
       {
          numDistinct     += summaryVector[i]->distinct();
-	 numWeak         += summaryVector[i]->weak;
-	 numStrongNospan += summaryVector[i]->strongNospan;
-	 numStrongSpan   += summaryVector[i]->strongSpan;
+         numWeak         += summaryVector[i]->weak;
+         numStrongNospan += summaryVector[i]->strongNospan;
+         numStrongSpan   += summaryVector[i]->strongSpan;
       }
       while (++i < numSummaries && summaryVector[i]->name == name &&
-	     summaryVector[i]->sampleID == sampleID);
+             summaryVector[i]->sampleID == sampleID);
 
       distinctStats.addValue(numDistinct);
       weakStats.addValue(numWeak);
@@ -298,7 +298,7 @@ int main(const int argc, const char *argv[])
       writeHeadingLine(annotationHeading);
       aggregateAll(summaryVector);
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       std::cerr << argv[0] << ": " << error.what() << std::endl;
       return 1;

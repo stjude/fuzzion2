@@ -23,7 +23,7 @@ public:
    TrimerFinder(const char *cstr, const int begin, const int len,
                 TrimerOffsets& trimerOffsets)
       : KmerFinder(&cstr[begin], len, TRIMER_LEN), cstrOffset(begin),
-	tOffsets(trimerOffsets) { }
+        tOffsets(trimerOffsets) { }
 
    virtual ~TrimerFinder() { }
 
@@ -130,7 +130,7 @@ static bool validateJunction(const String& sequence,
       if (msequence == "*") // wildcard middle
       {
          delete middle; middle = nullptr;
-	 return true;
+         return true;
       }
       else if (!invalidMiddleBase)
          return true;
@@ -142,20 +142,18 @@ static bool validateJunction(const String& sequence,
 }
 
 //------------------------------------------------------------------------------------
-// validateExclusion() validates a sequence containing exclusions
+// validateExtra() validates a sequence containing inclusions or exclusions
 
-static bool validateExclusion(const String& sequence,
-                              const int lparen, const int rparen,
-                              Seq *& left, Seq *& right, SeqVector *& xvector,
-			      String& xvis)
+static bool validateExtra(const String& sequence, const int delim1, const int delim2,
+                          Seq *& left, Seq *& right, SeqVector *& xvector,
+                          String& xvis)
 {
-   if (lparen == 0 || lparen >= rparen - 1 || rparen == sequence.length() - 1)
+   if (delim1 == 0 || delim1 >= delim2 - 1 || delim2 == sequence.length() - 1)
       return false;
 
-   // left(ex)right
-   const String lsequence = sequence.substr(0, lparen);
-   const String xsequence = sequence.substr(lparen + 1, rparen - lparen - 1);
-   const String rsequence = sequence.substr(rparen + 1);
+   const String lsequence = sequence.substr(0, delim1);
+   const String xsequence = sequence.substr(delim1 + 1, delim2 - delim1 - 1);
+   const String rsequence = sequence.substr(delim2 + 1);
 
    bool invalidLeftBase, invalidRightBase;
    left  = new Seq(lsequence, invalidLeftBase);
@@ -164,7 +162,7 @@ static bool validateExclusion(const String& sequence,
    if (!invalidLeftBase && !invalidRightBase)
    {
       StringVector v;
-      const int n = splitString(xsequence, v, '|'); // exclusions separated by '|'
+      const int n = splitString(xsequence, v, '|'); // the extras are separated by '|'
 
       xvector = new SeqVector();
       bool invalid = false;
@@ -199,24 +197,24 @@ Pattern::Pattern(const String& inName, const String& inSequence,
      xvector(nullptr), xvis(""), leftTrimers(), rightTrimers()
 {
    if (name.length() == 0)
-      throw std::runtime_error("missing pattern name");
+      throw Error("missing pattern name");
 
    if (findChar(name, ' ') >= 0)
-      throw std::runtime_error("space not allowed in pattern name \"" + name + "\"");
+      throw Error("space not allowed in pattern name \"" + name + "\"");
 
    if (sequence.length() == 0)
-      throw std::runtime_error("missing sequence for pattern \"" + name + "\"");
+      throw Error("missing sequence for pattern \"" + name + "\"");
 
    if (findChar(sequence, ' ') >= 0)
-      throw std::runtime_error("space not allowed in sequence for pattern \"" + name +
-                               "\"");
+      throw Error("space not allowed in sequence for pattern \"" + name + "\"");
 
    const int lbracket = findChar(sequence, '['), rbracket = findChar(sequence, ']');
    const int lbrace   = findChar(sequence, '{'), rbrace   = findChar(sequence, '}');
+   const int langle   = findChar(sequence, '<'), rangle   = findChar(sequence, '>');
    const int lparen   = findChar(sequence, '('), rparen   = findChar(sequence, ')');
 
    if (lbracket < 0 && rbracket < 0 && lbrace < 0 && rbrace < 0 &&
-       lparen < 0 && rparen < 0) // no delimiters in sequence
+       langle   < 0 && rangle   < 0 && lparen < 0 && rparen < 0) // no delimiters
    {
       if (validateNoDelims(sequence, left))
          return;
@@ -235,15 +233,22 @@ Pattern::Pattern(const String& inName, const String& inSequence,
       if (validateJunction(sequence, rbrace, lbrace, left, middle, right))
          return;
    }
+   else if (langle >= 0 && rangle >= 0)
+   {
+      delim1 = langle; delim2 = rangle;
+
+      if (validateExtra(sequence, langle, rangle, left, right, xvector, xvis))
+         return;
+   }
    else if (lparen >= 0 && rparen >= 0)
    {
       delim1 = lparen; delim2 = rparen;
 
-      if (validateExclusion(sequence, lparen, rparen, left, right, xvector, xvis))
+      if (validateExtra(sequence, lparen, rparen, left, right, xvector, xvis))
          return;
    }
 
-   throw std::runtime_error("invalid sequence for pattern \"" + name + "\"");
+   throw Error("invalid sequence for pattern \"" + name + "\"");
 }
 
 //------------------------------------------------------------------------------------
@@ -256,18 +261,18 @@ PatternVector *readPatterns(const String& filename, StringVector& annotationHead
 
    std::ifstream infile(filename.c_str());
    if (!infile.is_open())
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 
    String line;
 
    if (!getline(infile, line))
-      throw std::runtime_error("empty file " + filename);
+      throw Error("empty file " + filename);
 
    StringVector heading;
    const int numCols = splitString(line, heading);
 
    if (numCols < 2 || heading[0] != PATTERN_HEADING || heading[1] != SEQUENCE_HEADING)
-      throw std::runtime_error("invalid format in " + filename);
+      throw Error("invalid format in " + filename);
 
    for (int i = 2; i < numCols; i++)
       annotationHeading.push_back(heading[i]);
@@ -279,13 +284,13 @@ PatternVector *readPatterns(const String& filename, StringVector& annotationHead
       StringVector col, annotation;
 
       if (splitString(line, col) != numCols)
-         throw std::runtime_error("inconsistent #columns in " + filename);
+         throw Error("inconsistent #columns in " + filename);
 
       const String& name     = col[0];
       const String& sequence = col[1];
 
       if (nameSet.find(name) != nameSet.end())
-         throw std::runtime_error("duplicate pattern name \"" + name + "\"");
+         throw Error("duplicate pattern name \"" + name + "\"");
 
       nameSet.insert(name);
 
@@ -298,7 +303,7 @@ PatternVector *readPatterns(const String& filename, StringVector& annotationHead
    infile.close();
 
    if (pvector->size() == 0)
-      throw std::runtime_error("no patterns specified in " + filename);
+      throw Error("no patterns specified in " + filename);
 
    return pvector;
 }
@@ -309,9 +314,9 @@ PatternVector *readPatterns(const String& filename, StringVector& annotationHead
 
 static int getMinimizers(const Seq *seq, const int side, const int pindex,
                          const MinimizerWindowLength w,
-			 const KmerRankTable *rankTable,
-			 const Minimizer maxMinimizer, PatternMap& pmap,
-			 BoolVector& inPatternMap)
+                         const KmerRankTable *rankTable,
+                         const Minimizer maxMinimizer, PatternMap& pmap,
+                         BoolVector& inPatternMap)
 {
    WindowVector wvector;
    getWindows(seq->cstr, seq->len, w, rankTable, wvector);
@@ -345,8 +350,8 @@ static int getMinimizers(const Seq *seq, const int side, const int pindex,
 // caller's obligation to de-allocate these
 
 PatternMap *createPatternMap(PatternVector& pvector, const MinimizerWindowLength w,
-			     const KmerRankTable *rankTable,
-			     const Minimizer maxMinimizer, BoolVector *& inPatternMap)
+                             const KmerRankTable *rankTable,
+                             const Minimizer maxMinimizer, BoolVector *& inPatternMap)
 {
    PatternMap *pmap = new PatternMap();
    inPatternMap     = new BoolVector(maxMinimizer + 1, false);
@@ -364,14 +369,14 @@ PatternMap *createPatternMap(PatternVector& pvector, const MinimizerWindowLength
                                         maxMinimizer, *pmap, *inPatternMap);
 
       if (numMinimizers == 0)
-         throw std::runtime_error("the sequence for pattern \"" + pattern->name +
-                               "\" has no minimizers; it is too short or too common");
+         throw Error("the sequence for pattern \"" + pattern->name +
+                     "\" has no minimizers; it is too short or too common");
 
       if (pattern->right)
       {
          initTrimerOffsets(pattern->left->cstr,  0, pattern->left->len,
                            pattern->leftTrimers);
-	 initTrimerOffsets(pattern->right->cstr, 0, pattern->right->len,
+         initTrimerOffsets(pattern->right->cstr, 0, pattern->right->len,
                            pattern->rightTrimers);
       }
    }

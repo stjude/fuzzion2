@@ -18,13 +18,13 @@ public:
    Finder(const char *sequence, const int sequenceLen, const MinimizerWindowLength w,
           const KmerRankTable *rankTable, WindowVector& inWindowVector)
       : RankMinimizerFinder(sequence, sequenceLen, w, rankTable),
-	windowVector(inWindowVector) { }
+        windowVector(inWindowVector) { }
 
    virtual ~Finder() { }
 
    virtual bool reportMinimizer(const Minimizer minimizer,
                                 const int startIndex, const int windowID,
-				const bool finalMinimizer) override
+                                const bool finalMinimizer) override
    {
       windowVector.emplace_back(minimizer, startIndex);
       return true;
@@ -39,7 +39,7 @@ public:
 
 void getWindows(const char *sequence, const int sequenceLen,
                 const MinimizerWindowLength w, const KmerRankTable *rankTable,
-		WindowVector& windowVector)
+                WindowVector& windowVector)
 {
    Finder finder(sequence, sequenceLen, w, rankTable, windowVector);
    finder.find();

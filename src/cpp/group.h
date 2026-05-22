@@ -45,7 +45,7 @@ class GroupManager
 public:
    GroupManager(const String& groupColList,
                 const StringVector& patternAnnotationHeading,
-		const HitVector& hitVector);
+                const HitVector& hitVector);
 
    virtual ~GroupManager() { }
 

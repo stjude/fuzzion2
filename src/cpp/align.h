@@ -116,12 +116,12 @@ typedef std::map<int, AlignDuo> PatternAlignMap; // key is pattern index
 
 void connectReadToPatterns(const WindowVector& readWindowVector,
                            Minimizer maxMinimizer, const PatternMap& pmap,
-			   const BoolVector& inPmap, PatternOriginMap& omap,
-			   const BoolVector *eligible=nullptr);
+                           const BoolVector& inPmap, PatternOriginMap& omap,
+                           const BoolVector *eligible=nullptr);
 
 void getOverlap(const Sub& sub1, const Sub& sub2, Origin origin,
                 int& begin1, int& begin2, int& len, int& lbases1, int& lbases2,
-		int& rbases1, int& rbases2);
+                int& rbases1, int& rbases2);
 
 inline int computeMinMatches(const int len, const double minPercentAgreement)
 { return std::ceil((minPercentAgreement / 100) * len); }
@@ -130,6 +130,6 @@ Align *alignSubstrings(const Sub& sub1, const Sub& sub2, int minMatches);
 
 void alignReadToPatterns(const Seq& readSeq, const PatternVector& pvector,
                          double minPercentAgreement, const PatternOriginMap& omap,
-			 PatternAlignMap& amap);
+                         PatternAlignMap& amap);
 
 #endif

@@ -7,7 +7,7 @@
 // Copyright 2026 St. Jude Children's Research Hospital
 //
 //------------------------------------------------------------------------------------
-// Six types of patterns are supported:
+// Seven types of patterns are supported:
 //
 // Description                  Form       left  middle  right  xvector
 // --------------------    --------------  ----  ------  -----  -------
@@ -19,6 +19,7 @@
 // fusion with wildcard     left]*[right    yes    no     yes     no
 //    ITD with wildcard     left}*{right    yes    no     yes     no
 //
+// hotspot with inclusion  left<in>right    yes    no     yes     yes
 // hotspot with exclusion  left(ex)right    yes    no     yes     yes
 //------------------------------------------------------------------------------------
 
@@ -71,11 +72,11 @@ public:
    int delim1, delim2;            // offsets of delimiters in sequence (-1 if N/A)
 
    Seq *left;                     // left or unsided sequence (always non-null)
-   Seq *middle;                   // middle sequence          (nullptr if N/A)
-   Seq *right;                    // right sequence           (nullptr if N/A)
+   Seq *middle;                   // middle sequence (nullptr if N/A)
+   Seq *right;                    // right sequence  (nullptr if N/A)
 
-   SeqVector *xvector;            // excluded sequences       (nullptr if N/A)
-   String xvis;                   // visualization of excluded sequences
+   SeqVector *xvector;            // extra sequences (nullptr if N/A)
+   String xvis;                   // visualization of extra sequences
 
    TrimerOffsets leftTrimers, rightTrimers; // offsets of 3-mers in left & right
 };
@@ -108,6 +109,6 @@ PatternVector *readPatterns(const String& filename, StringVector& annotationHead
 
 PatternMap *createPatternMap(PatternVector& pvector, MinimizerWindowLength w,
                              const KmerRankTable *rankTable, Minimizer maxMinimizer,
-			     BoolVector *& inPatternMap);
+                             BoolVector *& inPatternMap);
 
 #endif

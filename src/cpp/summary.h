@@ -22,10 +22,10 @@ class Summary
 public:
    Summary(const String& inSampleID, const int inNumMatches, const int inWeak,
            const int inStrongNospan, const int inStrongSpan, const String& inName,
-	   const StringVector& inAnnotation)
+           const StringVector& inAnnotation)
       : sampleID(inSampleID), numMatches(inNumMatches), weak(inWeak),
-	strongNospan(inStrongNospan), strongSpan(inStrongSpan), name(inName),
-	annotation(inAnnotation) { }
+        strongNospan(inStrongNospan), strongSpan(inStrongSpan), name(inName),
+        annotation(inAnnotation) { }
 
    virtual ~Summary() { }
 

@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// util.h - module defining some utilities
+// util.h - module defining utilities
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -25,11 +25,11 @@
 #include <string>
 #include <vector>
 
-typedef std::vector<bool> BoolVector;
-typedef std::vector<int>  IntVector;
-
 typedef std::string String;
 typedef std::vector<String> StringVector;
+typedef std::vector<bool>   BoolVector;
+typedef std::vector<int>    IntVector;
+typedef std::runtime_error  Error;
 
 const char TAB     = '\t';
 const char NEWLINE = '\n';

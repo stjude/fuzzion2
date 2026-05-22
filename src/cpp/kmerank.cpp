@@ -44,7 +44,7 @@ void showUsage(const char *progname)
       << "The following are optional:" << NEWLINE
       << "  -k=N            "
              << "k-mer length, default is " << DEFAULT_KMER_LENGTH
-	     << ", maximum is " << static_cast<int>(MAX_KMER_LENGTH) << NEWLINE
+             << ", maximum is " << static_cast<int>(MAX_KMER_LENGTH) << NEWLINE
       << "  -txt=filename   "
              << "name of text output file, default is none" << NEWLINE;
 }
@@ -70,15 +70,15 @@ bool parseArgs(const int argc, const char *argv[])
 
       if (intOpt(opt, "k", k) ||
           stringOpt(opt, "ref", refGenFilename) ||
-	  stringOpt(opt, "bin", binaryFilename) ||
-	  stringOpt(opt, "txt", textFilename))
-         continue;  // this option has been recognized
+          stringOpt(opt, "bin", binaryFilename) ||
+          stringOpt(opt, "txt", textFilename))
+         continue;     // this option has been recognized
 
-      return false; // unrecognized option
+      return false;    // unrecognized option
    }
 
    if (k < 1 || k > MAX_KMER_LENGTH || refGenFilename == "" || binaryFilename == "")
-      return false; // missing or invalid option
+      return false;    // missing or invalid option
 
    return true;
 }
@@ -102,7 +102,7 @@ int main(const int argc, const char *argv[])
       if (textFilename != "")
          table->writeText(textFilename);
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       std::cerr << argv[0] << ": " << error.what() << std::endl;
       return 1;

@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// bamread.h - module providing functionality for reading Bam files
+// bamread.h - module for reading Bam files
 //
 // Author: Stephen V. Rice, Ph.D.
 //

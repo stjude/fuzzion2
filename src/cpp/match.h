@@ -105,17 +105,17 @@ void freePairMatchMap(PairMatchMap& pairMap);
 
 int getSingleMatches(const String& readStr, MinimizerWindowLength w,
                      const KmerRankTable *rankTable, Minimizer maxMinimizer,
-		     const PatternMap& pmap, const BoolVector& inPmap,
-		     const PatternVector& pvector, double minPercentAgreement,
-		     int minOverlap, Seq *& readSeq, SingleMatchMap& mmap,
-		     const SingleMatchMap *mateMap=nullptr);
+                     const PatternMap& pmap, const BoolVector& inPmap,
+                     const PatternVector& pvector, double minPercentAgreement,
+                     int minOverlap, Seq *& readSeq, SingleMatchMap& mmap,
+                     const SingleMatchMap *mateMap=nullptr);
 
 int getPairMatches(const String& readStr1, const String& readStr2,
                    MinimizerWindowLength w, const KmerRankTable *rankTable,
-		   Minimizer maxMinimizer, const PatternMap& pmap,
-		   const BoolVector& inPmap, const PatternVector& pvector,
-		   double minPercentAgreement, int minOverlap, int maxInsert,
-		   int maxTrim, Seq *& readSeq1, Seq *& readSeq2,
-		   PairMatchMap& pairMap);
+                   Minimizer maxMinimizer, const PatternMap& pmap,
+                   const BoolVector& inPmap, const PatternVector& pvector,
+                   double minPercentAgreement, int minOverlap, int maxInsert,
+                   int maxTrim, Seq *& readSeq1, Seq *& readSeq2,
+                   PairMatchMap& pairMap);
 
 #endif

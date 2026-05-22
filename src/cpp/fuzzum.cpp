@@ -40,10 +40,10 @@ void showUsage(const char *progname)
       << "The following are optional:" << NEWLINE
       << "  -group=string   "
              << "comma-separated list of column headings, default is no grouping"
-	     << NEWLINE
+             << NEWLINE
       << "  -strong=N       "
              << "minimum overlap of a strong match in #bases, default is "
-	     << DEFAULT_MIN_STRONG << NEWLINE;
+             << DEFAULT_MIN_STRONG << NEWLINE;
 }
 
 //------------------------------------------------------------------------------------
@@ -68,17 +68,17 @@ bool parseArgs(const int argc, const char *argv[])
       if (stringOpt(opt, "id",     id)           ||
           stringOpt(opt, "group",  groupColList) ||
           intOpt   (opt, "strong", minStrong))
-         continue;  // this option has been recognized
+         continue;     // this option has been recognized
 
-      return false; // unrecognized option
+      return false;    // unrecognized option
    }
 
    return (id != "" && minStrong >= TRIMER_LEN);
 }
 
 //------------------------------------------------------------------------------------
-// writePatternSummaries() writes to stdout a summary of hits for each pattern; it is
-// assumed that hitVector has been sorted
+// writePatternSummaries() writes a summary of hits for each pattern; it is assumed
+// that hitVector has been sorted
 
 void writePatternSummaries(const StringVector& annotationHeading,
                            const HitVector& hitVector)
@@ -101,7 +101,7 @@ void writePatternSummaries(const StringVector& annotationHeading,
 }
 
 //------------------------------------------------------------------------------------
-// writeGroupSummaries() writes to stdout a summary of hits for each pattern group
+// writeGroupSummaries() writes a summary of hits for each pattern group
 
 void writeGroupSummaries(const GroupManager& groupManager)
 {
@@ -144,10 +144,10 @@ int main(const int argc, const char *argv[])
       else
       {
          const GroupManager groupManager(groupColList, annotationHeading, hitVector);
-	 writeGroupSummaries(groupManager);
+         writeGroupSummaries(groupManager);
       }
    }
-   catch (const std::runtime_error& error)
+   catch (const Error& error)
    {
       std::cerr << argv[0] << ": " << error.what() << std::endl;
       return 1;

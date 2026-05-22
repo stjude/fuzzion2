@@ -46,15 +46,15 @@ Summary *Group::summarize(const int minStrong, const String& sampleID) const
       {
          const String label = hitVector[i]->label(minStrong);
 
-	 if (label == HIT_STRONG_SPAN)
-	 {
+         if (label == HIT_STRONG_SPAN)
+         {
             isStrongSpan = true;
-	    break;
-	 }
+            break;
+         }
 
-	 if (label == HIT_STRONG_NOSPAN)
+         if (label == HIT_STRONG_NOSPAN)
             isStrongNospan = true;
-	 else if (label == HIT_WEAK)
+         else if (label == HIT_WEAK)
             isWeak = true;
       }
 
@@ -97,7 +97,7 @@ int Group::maxGroupVisLength() const
 
 GroupManager::GroupManager(const String& groupColList,
                            const StringVector& patternAnnotationHeading,
-			   const HitVector& hitVector)
+                           const HitVector& hitVector)
    : annotationHeading(), gmap()
 {
    StringVector groupCol;
@@ -105,7 +105,7 @@ GroupManager::GroupManager(const String& groupColList,
 
    for (int i = 0; i < numGroupCols; i++)
       if (groupCol[i].find_first_not_of(' ') == String::npos)
-         throw std::runtime_error("invalid group column list");
+         throw Error("invalid group column list");
 
    int keyIndex;
    IntVector annotationIndex;
@@ -123,12 +123,12 @@ GroupManager::GroupManager(const String& groupColList,
          if (i == 0)
             keyIndex = j;
          else
-	 {
+         {
             annotationIndex.push_back(j);
-	    annotationHeading.push_back(groupCol[i]);
-	 }
+            annotationHeading.push_back(groupCol[i]);
+         }
       else
-         throw std::runtime_error("missing group column " + groupCol[i]);
+         throw Error("missing group column " + groupCol[i]);
    }
 
    const int numHits = hitVector.size();
@@ -158,17 +158,17 @@ GroupManager::GroupManager(const String& groupColList,
       {
          StringVector groupAnnotation;
 
-	 for (int j = 0; j < numGroupAnnotations; j++)
-	 {
+         for (int j = 0; j < numGroupAnnotations; j++)
+         {
             const int k = annotationIndex[j];
 
-	    if (k < numPatternAnnotations)
+            if (k < numPatternAnnotations)
                groupAnnotation.push_back(patternAnnotation[k]);
-	    else
+            else
                groupAnnotation.push_back(" ");
-	 }
+         }
 
-	 gpos = gmap.insert(
+         gpos = gmap.insert(
              std::make_pair(groupName, Group(groupName, groupAnnotation))).first;
       }
 

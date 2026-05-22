@@ -31,10 +31,10 @@ class HitRead // represents one read of a fuzzion2 hit
 public:
    HitRead(const String& inName, const String& inVis, const int inPossible,
            const int inMatches, const int inSpanning, const int inLoverlap,
-	   const int inRoverlap, const int inLen, const int inHash)
+           const int inRoverlap, const int inLen, const int inHash)
       : name(inName), vis(inVis), possible(inPossible), matches(inMatches),
-	spanning(inSpanning), loverlap(inLoverlap), roverlap(inRoverlap), len(inLen),
-	hash(inHash) { }
+        spanning(inSpanning), loverlap(inLoverlap), roverlap(inRoverlap), len(inLen),
+        hash(inHash) { }
 
    virtual ~HitRead() { }
 
@@ -79,7 +79,7 @@ public:
    const StringVector annotation; // pattern annotations
    const HitRead *read1;          // required read (cannot be nullptr)
    const HitRead *read2;          // optional second read (may be nullptr)
-   uint64_t hash;                 // hash of read sequence(s) (for duplicate detection)
+   uint64_t hash;                 // hash of read sequences (for duplicate detection)
    bool duplicate;                // true if this hit is a duplicate of another hit
 };
 
@@ -89,14 +89,14 @@ typedef std::vector<Hit *> HitVector;
 
 Hit *createHitFromSingleMatch(const Pattern& pattern, int maxmidlen,
                               double minPercentAgreement, int minOverlap,
-			      const String& readName, const Seq& readSeq,
-			      const SingleMatch& match);
+                              const String& readName, const Seq& readSeq,
+                              const SingleMatch& match);
 
 Hit *createHitFromPairMatch(const Pattern& pattern, int maxmidlen,
                             double minPercentAgreement, int minOverlap,
-			    const String& readName1, const Seq& readSeq1,
-			    const String& readName2, const Seq& readSeq2,
-			    const PairMatch& pairMatch);
+                            const String& readName1, const Seq& readSeq1,
+                            const String& readName2, const Seq& readSeq2,
+                            const PairMatch& pairMatch);
 
 void writeHitHeadingLine(std::ostream& ostream, const String& version,
                          const StringVector& annotationHeading);

@@ -24,7 +24,7 @@ uint32_t RefGenReader::readUint32()
    if (BinReader::readUint32(value))
       return value;
 
-   throw std::runtime_error("invalid format in " + filename);
+   throw Error("invalid format in " + filename);
 }
 
 //------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ void RefGenReader::open(const String& refGenFilename)
    if (signature == TWO_BIT_SIGNATURE_SWAP)
       swap = true;
    else if (signature != TWO_BIT_SIGNATURE_NOSWAP)
-      throw std::runtime_error(refGenFilename + " is not a 2-bit file");
+      throw Error(refGenFilename + " is not a 2-bit file");
 
    readUint32();          // skip version
    numref = readUint32(); // read number of references
@@ -55,11 +55,11 @@ void RefGenReader::open(const String& refGenFilename)
       if (readUint8(namelen) && readBuffer(name, namelen))
       {
          name[namelen] = 0; // append null terminating byte
-	 refName.push_back(name);
-	 refOffset.push_back(readUint32());
+         refName.push_back(name);
+         refOffset.push_back(readUint32());
       }
       else
-         throw std::runtime_error("invalid format in " + refGenFilename);
+         throw Error("invalid format in " + refGenFilename);
 }
 
 //------------------------------------------------------------------------------------
@@ -78,8 +78,7 @@ RefGenSeq *RefGenReader::getRefGenSeq(const String& selectedRefName,
       i++;
 
    if (i == numref)
-      throw std::runtime_error("unrecognized reference name \"" + selectedRefName +
-                               "\"");
+      throw Error("unrecognized reference name \"" + selectedRefName + "\"");
 
    seek(refOffset[i]);
 
@@ -89,7 +88,7 @@ RefGenSeq *RefGenReader::getRefGenSeq(const String& selectedRefName,
       endPos = reflen;
 
    if (beginPos < 1 || beginPos > endPos)
-      throw std::runtime_error("invalid position");
+      throw Error("invalid position");
 
    char *sequence = new char[endPos - beginPos + 1];
 
@@ -124,7 +123,7 @@ RefGenSeq *RefGenReader::getRefGenSeq(const String& selectedRefName,
    for (int pos = beginPos; pos <= endPos; pos++)
    {
       if (readByte && !readUint8(byte))
-         throw std::runtime_error("truncated 2-bit file " + filename);
+         throw Error("truncated 2-bit file " + filename);
 
       const uint8_t shift = 2 * (3 - ((pos - 1) & 3));
       const uint8_t index = (byte >> shift) & 3;
@@ -140,9 +139,9 @@ RefGenSeq *RefGenReader::getRefGenSeq(const String& selectedRefName,
       if (nstart[i] <= endPos && nstop[i] >= beginPos)
       {
          const int start = std::max(nstart[i], beginPos);
-	 const int stop  = std::min(nstop[i],  endPos);
+         const int stop  = std::min(nstop[i],  endPos);
 
-	 for (int pos = start; pos <= stop; pos++)
+         for (int pos = start; pos <= stop; pos++)
             sequence[pos - beginPos] = 'N';
       }
 

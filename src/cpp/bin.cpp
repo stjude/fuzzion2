@@ -36,7 +36,7 @@ void BinReader::open(const String& binFilename)
    fd = ::open(filename.c_str(), O_RDONLY);
 
    if (!isOpen())
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 
    len   = 0;
    index = 0;
@@ -48,10 +48,10 @@ void BinReader::open(const String& binFilename)
 void BinReader::seek(const uint64_t byteOffset)
 {
    if (!isOpen())
-      throw std::runtime_error("attempt to seek in unopened binary file");
+      throw Error("attempt to seek in unopened binary file");
 
    if (lseek(fd, byteOffset, SEEK_SET) == -1)
-      throw std::runtime_error("seek error in " + filename);
+      throw Error("seek error in " + filename);
 
    len   = 0;
    index = 0;
@@ -65,12 +65,12 @@ void BinReader::seek(const uint64_t byteOffset)
 bool BinReader::fill()
 {
    if (!isOpen())
-      throw std::runtime_error("attempt to read from unopened binary file");
+      throw Error("attempt to read from unopened binary file");
 
    const ssize_t bytes = read(fd, buf, size);
 
    if (bytes == -1)
-      throw std::runtime_error("error reading from " + filename);
+      throw Error("error reading from " + filename);
 
    len   = bytes;
    index = 0;
@@ -211,7 +211,7 @@ void BinReader::close()
       return;
 
    if (::close(fd) == -1)
-      throw std::runtime_error("error closing " + filename);
+      throw Error("error closing " + filename);
 
    filename = "";
    fd       = BINARY_FILE_NOT_OPEN;
@@ -246,7 +246,7 @@ void BinWriter::open(const String& binFilename, const bool newFile)
       fd = ::open(filename.c_str(), O_WRONLY);
 
    if (!isOpen())
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 
    index   = 0;
    flushed = 0;
@@ -258,13 +258,13 @@ void BinWriter::open(const String& binFilename, const bool newFile)
 void BinWriter::flush()
 {
    if (!isOpen())
-      throw std::runtime_error("attempt to write to unopened binary file");
+      throw Error("attempt to write to unopened binary file");
 
    if (index == 0) // nothing to flush
       return;
 
    if (write(fd, buf, index) != index)
-      throw std::runtime_error("error writing to " + filename);
+      throw Error("error writing to " + filename);
 
    flushed += index;
    index    = 0;
@@ -346,7 +346,7 @@ void BinWriter::close()
       flush();
 
    if (::close(fd) == -1)
-      throw std::runtime_error("error closing " + filename);
+      throw Error("error closing " + filename);
 
    filename = "";
    fd       = BINARY_FILE_NOT_OPEN;

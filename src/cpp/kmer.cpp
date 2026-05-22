@@ -16,7 +16,7 @@
 String kmerToString(const KmerLength k, Kmer kmer)
 {
    if (k > MAX_KMER_LENGTH)
-      throw std::runtime_error("unsupported k-mer length");
+      throw Error("unsupported k-mer length");
 
    char buffer[MAX_KMER_LENGTH + 1];
    buffer[MAX_KMER_LENGTH] = 0; // null terminating byte
@@ -36,7 +36,7 @@ String kmerToString(const KmerLength k, Kmer kmer)
 Kmer stringToKmer(const String& s)
 {
    if (s.length() > MAX_KMER_LENGTH)
-      throw std::runtime_error("unsupported k-mer length");
+      throw Error("unsupported k-mer length");
 
    const KmerLength k = s.length();
    Kmer kmer = 0;
@@ -48,7 +48,7 @@ Kmer stringToKmer(const String& s)
       if (base < NUM_BASES)
          kmer = (kmer << 2) | base;
       else
-         throw std::runtime_error("cannot convert " + s);
+         throw Error("cannot convert " + s);
    }
 
    return kmer;
@@ -60,7 +60,7 @@ Kmer stringToKmer(const String& s)
 Kmer kmerReverseComplement(const KmerLength k, Kmer kmer)
 {
    if (k > MAX_KMER_LENGTH)
-      throw std::runtime_error("unsupported k-mer length");
+      throw Error("unsupported k-mer length");
 
    Kmer revcomp = 0;
 
@@ -113,7 +113,7 @@ KmerFinder::KmerFinder(const char *sequence, const int sequenceLen,
    : seq(sequence), seqlen(sequenceLen), k(kmerLen), mask(numKmers(kmerLen) - 1)
 {
    if (k < 1 || k > MAX_KMER_LENGTH)
-      throw std::runtime_error("unsupported k-mer length");
+      throw Error("unsupported k-mer length");
 }
 
 //------------------------------------------------------------------------------------
@@ -133,67 +133,67 @@ void KmerFinder::find()
       {
          case 'A': case 'a':
             if (len == k)
-	    {
+            {
                if (!reportKmer(kmer = (kmer << 2) & mask, i - k + 1))
                   return;
-	    }
-	    else if (++len == k)
-	    {
+            }
+            else if (++len == k)
+            {
                if (!reportKmer(kmer, i - k + 1))
                   return;
-	    }
-	    break;
+            }
+            break;
 
-	 case 'C': case 'c':
+         case 'C': case 'c':
             if (len == k)
-	    {
+            {
                if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_C, i - k + 1))
                   return;
-	    }
-	    else if (++len == k)
-	    {
+            }
+            else if (++len == k)
+            {
                if (!reportKmer(kmer |= BASE_C, i - k + 1))
                   return;
-	    }
-	    else
+            }
+            else
                kmer |= BASE_C << ((k - len) << 1);
-	    break;
+            break;
 
-	 case 'G': case 'g':
+         case 'G': case 'g':
             if (len == k)
-	    {
+            {
                if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_G, i - k + 1))
                   return;
-	    }
-	    else if (++len == k)
-	    {
+            }
+            else if (++len == k)
+            {
                if (!reportKmer(kmer |= BASE_G, i - k + 1))
                   return;
-	    }
-	    else
+            }
+            else
                kmer |= BASE_G << ((k - len) << 1);
-	    break;
+            break;
 
-	 case 'T': case 't':
+         case 'T': case 't':
             if (len == k)
-	    {
+            {
                if (!reportKmer(kmer = ((kmer << 2) & mask) | BASE_T, i - k + 1))
                   return;
-	    }
-	    else if (++len == k)
-	    {
+            }
+            else if (++len == k)
+            {
                if (!reportKmer(kmer |= BASE_T, i - k + 1))
                   return;
-	    }
-	    else
+            }
+            else
                kmer |= BASE_T << ((k - len) << 1);
-	    break;
+            break;
 
-	 default: // some other base, such as 'N'
+         default: // some other base, such as 'N'
             if (len > 0)
-	    {
+            {
                kmer = 0;
-	       len  = 0;
-	    }
+               len  = 0;
+            }
       }
 }

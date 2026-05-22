@@ -118,10 +118,9 @@ static void adjustInitial(const int initial, const int lbases, Sub& subA, Sub& s
    {
       if (subA.seq.cstr[subA.begin - 1] == subB.seq.cstr[subB.begin + i])
       {
-	 visA[i] = subA.seq.str[--subA.begin];
-	 subA.len++;
-
-	 bases++;
+         visA[i] = subA.seq.str[--subA.begin];
+         subA.len++;
+         bases++;
       }
 
       i--;
@@ -149,10 +148,9 @@ static void adjustTrailing(const int trailing, const int rbases, Sub& subA, Sub&
    {
       if (subA.seq.cstr[subA.end()] == subB.seq.cstr[subB.end() - trailing + i])
       {
-	 visA[visA.length() - trailing + i] = subA.seq.str[subA.end()];
-	 subA.len++;
-
-	 bases++;
+         visA[visA.length() - trailing + i] = subA.seq.str[subA.end()];
+         subA.len++;
+         bases++;
       }
 
       i++;
@@ -204,7 +202,7 @@ void Align::getStats(int& possible, int& matches) const
 {
    possible = vis1.length();
    if (possible != vis2.length()) // this should never happen
-      throw std::runtime_error("internal vis error");
+      throw Error("internal vis error");
 
    matches = 0;
    int j1 = sub1.begin, j2 = sub2.begin;
@@ -221,10 +219,10 @@ void Align::getStats(int& possible, int& matches) const
             matches++;
       }
       else // this should never happen
-         throw std::runtime_error("internal vis error");
+         throw Error("internal vis error");
 
    if (j1 != end1 || j2 != end2) // this should never happen
-      throw std::runtime_error("internal vis error");
+      throw Error("internal vis error");
 }
 
 //------------------------------------------------------------------------------------
@@ -236,8 +234,8 @@ void Align::getStats(int& possible, int& matches) const
 
 void connectReadToPatterns(const WindowVector& readWindowVector,
                            const Minimizer maxMinimizer, const PatternMap& pmap,
-			   const BoolVector& inPmap, PatternOriginMap& omap,
-			   const BoolVector *eligible)
+                           const BoolVector& inPmap, PatternOriginMap& omap,
+                           const BoolVector *eligible)
 {
    const int numReadWindows = readWindowVector.size();
 
@@ -265,21 +263,21 @@ void connectReadToPatterns(const WindowVector& readWindowVector,
       {
          const int numPloc = pduo[side].size();
 
-	 for (int j = 0; j < numPloc; j++)
-	 {
+         for (int j = 0; j < numPloc; j++)
+         {
             const Ploc& ploc = pduo[side][j];
 
-	    if (eligible && !(*eligible)[ploc.pindex])
+            if (eligible && !(*eligible)[ploc.pindex])
                continue;
 
-	    PatternOriginMap::iterator opos = omap.find(ploc.pindex);
-	    if (opos == omap.end())
-               opos =
-                  omap.insert(std::make_pair(ploc.pindex, OriginCounterDuo())).first;
+            PatternOriginMap::iterator opos = omap.find(ploc.pindex);
+            if (opos == omap.end())
+               opos = omap.insert(std::make_pair(ploc.pindex,
+                                                 OriginCounterDuo())).first;
 
-	    OriginCounterDuo& oduo = opos->second;
-	    oduo[side].incrementCount(getOrigin(ploc.poffset, readWindow.offset));
-	 }
+            OriginCounterDuo& oduo = opos->second;
+            oduo[side].incrementCount(getOrigin(ploc.poffset, readWindow.offset));
+         }
       }
    }
 }
@@ -290,7 +288,7 @@ void connectReadToPatterns(const WindowVector& readWindowVector,
 
 void getOverlap(const Sub& sub1, const Sub& sub2, const Origin origin,
                 int& begin1, int& begin2, int& len,
-		int& lbases1, int& lbases2, int& rbases1, int& rbases2)
+                int& lbases1, int& lbases2, int& rbases1, int& rbases2)
 {
    begin1 = std::max(sub1.begin, sub2.begin + origin);
    begin2 = begin1 - origin;
@@ -321,21 +319,21 @@ public:
 
       for (int i = 0; i < len; i++)
          switch (cstr[i])
-	 {
+         {
             case 'A': acount++; break;
             case 'C': ccount++; break;
             case 'G': gcount++; break;
             case 'T': tcount++; break;
             default : break;
-	 }
+         }
    }
 
    int maxMatches(const BaseCounts& other) const
    {
       return std::min(acount, other.acount) +
              std::min(ccount, other.ccount) +
-	     std::min(gcount, other.gcount) +
-	     std::min(tcount, other.tcount);
+             std::min(gcount, other.gcount) +
+             std::min(tcount, other.tcount);
    }
 
    int acount, ccount, gcount, tcount;
@@ -377,18 +375,18 @@ static void generateVis(const Sub& sub1, const Sub& sub2, int **matrix,
           matrix[i - 1][j - 1] >= std::max(matrix[i][j - 1], matrix[i - 1][j])))
       {
          // match or substitution
-	 buf1[k] = str1[--i];
-	 buf2[k] = str2[--j];
+         buf1[k] = str1[--i];
+         buf2[k] = str2[--j];
       }
       else if (i == 0 || j > 0 && matrix[i][j - 1] >= matrix[i - 1][j])
       {
          buf1[k] = SPACER;
-	 buf2[k] = str2[--j];
+         buf2[k] = str2[--j];
       }
       else
       {
          buf1[k] = str1[--i];
-	 buf2[k] = SPACER;
+         buf2[k] = SPACER;
       }
    }
 
@@ -434,12 +432,12 @@ Align *alignSubstrings(const Sub& sub1, const Sub& sub2, const int minMatches)
       {
          const int above = previous[j];
 
-	 current[j] = last =
+         current[j] = last =
             (cstr1[i - 1] == cstr2[j - 1] ? diag + 1 : std::max(last, above));
 
-	 diag = above;
+         diag = above;
 
-	 if (mayAbort && last + std::min(irem, len2 - j) >= minMatches)
+         if (mayAbort && last + std::min(irem, len2 - j) >= minMatches)
             mayAbort = false;
       }
 
@@ -506,7 +504,7 @@ static Align *alignByOrigin(const Sub& sub1, const Sub& sub2, const Origin origi
 
 static int alignByEachOrigin(const Sub& sub1, const Sub& sub2,
                              const OriginVector& ovector,
-			     const double minPercentAgreement, AlignVector& avector)
+                             const double minPercentAgreement, AlignVector& avector)
 {
    int numAligns  = 0;
    const int numOrigins = ovector.size();
@@ -518,7 +516,7 @@ static int alignByEachOrigin(const Sub& sub1, const Sub& sub2,
       if (align)
       {
          avector.push_back(align);
-	 numAligns++;
+         numAligns++;
       }
    }
 
@@ -533,7 +531,7 @@ static int alignByEachOrigin(const Sub& sub1, const Sub& sub2,
 
 void alignReadToPatterns(const Seq& readSeq, const PatternVector& pvector,
                          const double minPercentAgreement,
-			 const PatternOriginMap& omap, PatternAlignMap& amap)
+                         const PatternOriginMap& omap, PatternAlignMap& amap)
 {
    for (PatternOriginMap::const_iterator opos = omap.cbegin();
         opos != omap.cend(); ++opos)
@@ -545,27 +543,27 @@ void alignReadToPatterns(const Seq& readSeq, const PatternVector& pvector,
       for (int side = 0; side < 2; side++) // 0 for left/unsided; 1 for right side
       {
          const int maxCount = oduo[side].maxCount(); // max #occurrences of an origin
-	 if (maxCount == 0)
+         if (maxCount == 0)
             continue; // nothing on this side
 
-	 OriginVector ovector;
-	 oduo[side].retrieveOrigins(maxCount / 2, ovector);
+         OriginVector ovector;
+         oduo[side].retrieveOrigins(maxCount / 2, ovector);
 
-	 const Seq& patternSeq = (side == 0 ? *pattern.left : *pattern.right);
-	 const Sub patternSub(patternSeq);
-	 const Sub readSub(readSeq);
-	 AlignVector avector;
+         const Seq& patternSeq = (side == 0 ? *pattern.left : *pattern.right);
+         const Sub patternSub(patternSeq);
+         const Sub readSub(readSeq);
+         AlignVector avector;
 
-	 if (alignByEachOrigin(patternSub, readSub, ovector, minPercentAgreement,
+         if (alignByEachOrigin(patternSub, readSub, ovector, minPercentAgreement,
                                avector) > 0) // got one or more alignments
-	 {
+         {
             PatternAlignMap::iterator apos = amap.find(pindex);
-	    if (apos == amap.end())
+            if (apos == amap.end())
                apos = amap.insert(std::make_pair(pindex, AlignDuo())).first;
 
-	    AlignDuo& aduo = apos->second;
-	    aduo[side] = avector; // save the alignments here
-	 }
+            AlignDuo& aduo = apos->second;
+            aduo[side] = avector; // save the alignments here
+         }
       }
    }
 }

@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// rank.cpp - module with logic for k-mer rank tables
+// rank.cpp - module for k-mer rank tables
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -71,7 +71,7 @@ KmerRankTable::KmerRankTable(const KmerLength kmerLen)
    : k(kmerLen)
 {
    if (k < 4 || k > MAX_KMER_LENGTH)
-      throw std::runtime_error("unsupported k-mer length");
+      throw Error("unsupported k-mer length");
 
    rank = new KmerRank[numKmers(k)];
 }
@@ -84,7 +84,7 @@ void KmerRankTable::writeText(const String& textFilename) const
    std::ofstream outfile(textFilename.c_str());
 
    if (!outfile.is_open())
-      throw std::runtime_error("unable to create " + textFilename);
+      throw Error("unable to create " + textFilename);
 
    const Kmer n = numKmers(k);
 
@@ -134,7 +134,7 @@ KmerRankTable *readRankTable(const String& binaryFilename)
        signature != RANK_FILE_SIGNATURE_NOSWAP &&
        signature != RANK_FILE_SIGNATURE_SWAP ||
        !reader.readUint8(k))
-      throw std::runtime_error(binaryFilename + " is not a k-mer rank file");
+      throw Error(binaryFilename + " is not a k-mer rank file");
 
    KmerRankTable *table = new KmerRankTable(k);
 
@@ -147,12 +147,12 @@ KmerRankTable *readRankTable(const String& binaryFilename)
 
    for (int i = 0; i < 4; i++)
       if (!reader.readBuffer(&table->rank[i * quarter], numBytes))
-         throw std::runtime_error("truncated k-mer rank file " + binaryFilename);
+         throw Error("truncated k-mer rank file " + binaryFilename);
 
    // make sure there are no additional bytes in the file
    uint8_t extraByte;
    if (reader.readUint8(extraByte))
-      throw std::runtime_error("invalid k-mer rank file " + binaryFilename);
+      throw Error("invalid k-mer rank file " + binaryFilename);
 
    reader.close();
 

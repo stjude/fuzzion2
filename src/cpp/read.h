@@ -13,8 +13,6 @@
 
 #include "bamread.h"
 
-const int LINEBUF_LEN = 1000000; // accommodate a long read
-
 //------------------------------------------------------------------------------------
 
 class FileReader // abstract class for getting reads from a file
@@ -22,7 +20,7 @@ class FileReader // abstract class for getting reads from a file
 public:
    FileReader(const String& inFilename)
       : filename(inFilename), initialName(), initialStr(), initialConsumed(0),
-	interleaved(false) { }
+        interleaved(false) { }
 
    virtual ~FileReader() { }
 
@@ -49,9 +47,11 @@ typedef std::vector<FileReader *> FileVector;
 class FastqFileReader : public FileReader // for reading a FASTQ file
 {
 public:
+   static constexpr int LINEBUF_LEN = 1000000; // accommodate a long read
+
    FastqFileReader(const String& inFilename)
       : FileReader(inFilename), fileHandle(nullptr), isPipe(false),
-	linebuf(new char[LINEBUF_LEN]) { }
+        linebuf(new char[LINEBUF_LEN]) { }
 
    virtual ~FastqFileReader() { delete[] linebuf; }
 
@@ -121,7 +121,7 @@ public:
 
 SingleReader *createSingleReader(const String& fastq1, const String& fastq2,
                                  const String& ifastq, const String& ubam,
-				 const StringVector& filename);
+                                 const StringVector& filename);
 
 PairReader *createPairReader(const String& fastq1, const String& fastq2,
                              const String& ifastq, const String& ubam,

@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// util.cpp - module defining some utilities
+// util.cpp - module defining utilities
 //
 // Author: Stephen V. Rice, Ph.D.
 //
@@ -198,7 +198,7 @@ void logOpen(const String& filename)
 
    logfile = new std::ofstream(filename.c_str());
    if (!logfile->is_open())
-      throw std::runtime_error("unable to open " + filename);
+      throw Error("unable to open " + filename);
 }
 
 //------------------------------------------------------------------------------------

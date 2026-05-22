@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------------------
 //
-// rank.h - module with logic for k-mer rank tables
+// rank.h - module for k-mer rank tables
 //
 // Author: Stephen V. Rice, Ph.D.
 //

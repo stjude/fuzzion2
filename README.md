@@ -101,10 +101,19 @@ An ITD pattern sequence uses braces instead of brackets: left}middle{right
 
 #### Hotspot Patterns
 
-A hotspot pattern defines a two-sided pattern sequence for finding reads that harbor a hotspot mutation such as a single nucleotide variant (SNV).  A read matches this pattern if it can be aligned to the left- and right-hand sides without matching any of the middle sequences in parentheses.  Each middle sequence is a string of one or more bases.  If there is more than one middle sequence, they are separated by vertical bars as shown in the examples below.  These middle sequences typically represent wild-type alleles, and matches are reported when reads differ from them.
+A hotspot pattern defines a two-sided pattern sequence for finding reads that harbor a hotspot mutation such as a single nucleotide variant (SNV) or indel.  A read matches this pattern if it can be aligned to the left- and right-hand sides and does (or does not) match one of the middle sequences.  An *inclusive* hotspot pattern specifies one or more middle sequences within *angle brackets*, and the read must match exactly one of these middle sequences.  On the other hand, an *exclusive* hotspot pattern specifies middle sequences within *parentheses*, and the read must not match any of them.
+
+Each middle sequence is a string of one or more bases.  If there is more than one middle sequence, they are separated by vertical bars as shown in the examples below.  One use of hotspot patterns is to specify an inclusive hotspot pattern to find reads that match a reference allele, such as C, by putting it in angle brackets, <code>\<C\></code>; and specify an exclusive hotspot pattern to find reads with alternate alleles by putting the reference allele in parentheses, <code>(C)</code>.  Reads containing the reference allele will match the first pattern, and reads containing alternate alleles will match the second pattern.
+
+An inclusive hotspot pattern specifying <code>\<A|G\></code> will match a read that has A or G at that location.  An exclusive hotspot pattern specifying <code>(A|G)</code> will match a read that has neither A nor G at that location.
 
 ```
-A hotspot pattern sequence is in this form: left(exclude)right
+An inclusive hotspot pattern sequence is in this form: left<include>right
+...AAGATCTCAAGAGGATTAGGAATAGGACAG<C>TACAGGGGGGACTACAACAGGATGATGGTT...
+...TGATACCAAATGGATCCGATTCTCTAGGAT<A|G>GACTCTTATTAGGGAGTTATAAATATTTTT...
+...CGAGACAAATTGAGAACCCATTATAGAACG<T|TC|TTA>AACCACCATTATGGGAATAGGATAGGATTA...
+
+An exclusive hotspot pattern sequence is in this form: left(exclude)right
 ...AAGATCTCAAGAGGATTAGGAATAGGACAG(C)TACAGGGGGGACTACAACAGGATGATGGTT...
 ...TGATACCAAATGGATCCGATTCTCTAGGAT(A|G)GACTCTTATTAGGGAGTTATAAATATTTTT...
 ...CGAGACAAATTGAGAACCCATTATAGAACG(T|TC|TTA)AACCACCATTATGGGAATAGGATAGGATTA...
@@ -247,7 +256,7 @@ In the following example output from *fuzzhop*, we see that the *fuzzion2* outpu
 
 ```
                                              strong hits  strong hits
-fuzzhop v2.0.0        flowcell lane             here      elsewhere   file name
+fuzzhop v2.1.0        flowcell lane             here      elsewhere   file name
 BCOR-CCNB3-08         K00309:78:HHLVFBBXX:7        1           0      SJBT030392_D1.txt
 BCOR-CCNB3-08         K00309:78:HHLVFBBXX:7     1573        1620      SJST030389_D1.txt
 

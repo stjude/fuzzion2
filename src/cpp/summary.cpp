@@ -83,15 +83,15 @@ static void sortSummaries(SummaryVector& summaryVector)
 
 void writeSummaryHeadingLine(std::ostream& ostream, const String& version,
                              const bool grouping,
-			     const StringVector& annotationHeading)
+                             const StringVector& annotationHeading)
 {
    ostream << FUZZUM << version
            << TAB << TOTAL
-	   << TAB << DISTINCT
-	   << TAB << WEAK
-	   << TAB << STNOSPAN
-	   << TAB << STSPAN
-	   << TAB << (grouping ? GROUP : PATTERN);
+           << TAB << DISTINCT
+           << TAB << WEAK
+           << TAB << STNOSPAN
+           << TAB << STSPAN
+           << TAB << (grouping ? GROUP : PATTERN);
 
    const int numAnnotations = annotationHeading.size();
 
@@ -141,11 +141,11 @@ void Summary::write(std::ostream& ostream) const
 {
    ostream << sampleID
            << TAB << numMatches
-	   << TAB << distinct()
-	   << TAB << weak
-	   << TAB << strongNospan
-	   << TAB << strongSpan
-	   << TAB << name;
+           << TAB << distinct()
+           << TAB << weak
+           << TAB << strongNospan
+           << TAB << strongSpan
+           << TAB << name;
 
    const int numAnnotations = annotation.size();
 
@@ -199,36 +199,35 @@ void readSummaries(const StringVector& filename, StringVector& annotationHeading
    {
       std::ifstream infile(filename[i].c_str());
       if (!infile.is_open())
-         throw std::runtime_error("unable to open " + filename[i]);
+         throw Error("unable to open " + filename[i]);
 
       if (!getline(infile, line))
-         throw std::runtime_error("empty file " + filename[i]);
+         throw Error("empty file " + filename[i]);
 
       if (!validHeadingLine(line, annotationHeading))
-         throw std::runtime_error("unexpected heading line in " + filename[i]);
+         throw Error("unexpected heading line in " + filename[i]);
 
       if (i == 0)
          headingLine = line;
       else if (line != headingLine)
-         throw std::runtime_error("inconsistent heading lines in input files");
+         throw Error("inconsistent heading lines in input files");
 
       while (getline(infile, line))
          if (isHeadingLine(line)) // found another heading line in this file
-	 {
+         {
             if (line != headingLine)
-               throw std::runtime_error("inconsistent heading lines in " +
-                                        filename[i]);
-	 }
+               throw Error("inconsistent heading lines in " + filename[i]);
+         }
          else
-	 {
+         {
             Summary *summary = getSummary(line);
 
-	    if (summary)
+            if (summary)
                summaryVector.push_back(summary);
-	    else
-               throw std::runtime_error("unexpected summary format in " +
-                                        filename[i] + ": " + line);
-	 }
+            else
+               throw Error("unexpected summary format in " + filename[i] + ": " +
+                           line);
+         }
 
       infile.close();
    }
