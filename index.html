@@ -185,8 +185,15 @@ An ITD pattern sequence uses braces instead of brackets: left}middle{right
 ...GGAAATCACCAGTGTACGATATGGCACTAA}*{TTAAGACCCATAACTGGAAGAGGAAGCTCA...
 </code></pre>
 <h4 id="hotspot-patterns">Hotspot Patterns</h4>
-<p>A hotspot pattern defines a two-sided pattern sequence for finding reads that harbor a hotspot mutation such as a single nucleotide variant (SNV).  A read matches this pattern if it can be aligned to the left- and right-hand sides without matching any of the middle sequences in parentheses.  Each middle sequence is a string of one or more bases.  If there is more than one middle sequence, they are separated by vertical bars as shown in the examples below.  These middle sequences typically represent wild-type alleles, and matches are reported when reads differ from them.</p>
-<pre><code>A hotspot pattern sequence is in this form: left(exclude)right
+<p>A hotspot pattern defines a two-sided pattern sequence for finding reads that harbor a hotspot mutation such as a single nucleotide variant (SNV) or indel.  A read matches this pattern if it can be aligned to the left- and right-hand sides and does (or does not) match one of the middle sequences.  An <em>inclusive</em> hotspot pattern specifies one or more middle sequences within <em>angle brackets</em>, and the read must match exactly one of these middle sequences.  On the other hand, an <em>exclusive</em> hotspot pattern specifies middle sequences within <em>parentheses</em>, and the read must not match any of them.</p>
+<p>Each middle sequence is a string of one or more bases.  If there is more than one middle sequence, they are separated by vertical bars as shown in the examples below.  One use of hotspot patterns is to specify an inclusive hotspot pattern to find reads that match a reference allele, such as C, by putting it in angle brackets, <code>\&lt;C&gt;</code>; and specify an exclusive hotspot pattern to find reads with alternate alleles by putting the reference allele in parentheses, <code>(C)</code>.  Reads containing the reference allele will match the first pattern, and reads containing alternate alleles will match the second pattern.</p>
+<p>An inclusive hotspot pattern specifying <code>\&lt;A|G&gt;</code> will match a read that has A or G at that location.  An exclusive hotspot pattern specifying <code>(A|G)</code> will match a read that has neither A nor G at that location.</p>
+<pre><code>An inclusive hotspot pattern sequence is in this form: left&lt;include&gt;right
+...AAGATCTCAAGAGGATTAGGAATAGGACAG&lt;C&gt;TACAGGGGGGACTACAACAGGATGATGGTT...
+...TGATACCAAATGGATCCGATTCTCTAGGAT&lt;A|G&gt;GACTCTTATTAGGGAGTTATAAATATTTTT...
+...CGAGACAAATTGAGAACCCATTATAGAACG&lt;T|TC|TTA&gt;AACCACCATTATGGGAATAGGATAGGATTA...
+
+An exclusive hotspot pattern sequence is in this form: left(exclude)right
 ...AAGATCTCAAGAGGATTAGGAATAGGACAG(C)TACAGGGGGGACTACAACAGGATGATGGTT...
 ...TGATACCAAATGGATCCGATTCTCTAGGAT(A|G)GACTCTTATTAGGGAGTTATAAATATTTTT...
 ...CGAGACAAATTGAGAACCCATTATAGAACG(T|TC|TTA)AACCACCATTATGGGAATAGGATAGGATTA...
@@ -289,7 +296,7 @@ The following are optional:
 </code></pre>
 <p>In the following example output from <em>fuzzhop</em>, we see that the <em>fuzzion2</em> output file named <code>SJST030389_D1.txt</code> contains many strong matches of the pattern named <code>BCOR-CCNB3-08</code>: 1,573 of these matches originated from flowcell lane <code>K00309:78:HHLVFBBXX:7</code> and 1,620 came from other flowcell lanes.  By contrast, the file named <code>SJBT030392_D1.txt</code> has only one strong match of this pattern.  We can reasonably conclude that this match is due to index hopping, i.e., the read pair matched to this pattern was assigned to the wrong sample in the sequencing process.  Likewise, we see many strong matches of pattern <code>HOXA10-HOXA9-CDK6-01</code> in <code>SJTALL032261_D1.txt</code>, with a few that were likely misassigned to two other samples.  Although we say "likely," it is possible that these samples have a lowly expressed fusion.</p>
 <pre><code>                                             strong hits  strong hits
-fuzzhop v2.0.0        flowcell lane             here      elsewhere   file name
+fuzzhop v2.1.0        flowcell lane             here      elsewhere   file name
 BCOR-CCNB3-08         K00309:78:HHLVFBBXX:7        1           0      SJBT030392_D1.txt
 BCOR-CCNB3-08         K00309:78:HHLVFBBXX:7     1573        1620      SJST030389_D1.txt
 
@@ -382,5 +389,5 @@ HOXA10-HOXA9-CDK6-01  A00908:71:HLGTLDRXX:1      352           0      SJTALL0322
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-04-22 13:54:25.315744+00:00
+Build Date UTC : 2026-05-22 14:40:09.042148+00:00
 -->
